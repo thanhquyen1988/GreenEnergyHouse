@@ -1,0 +1,2376 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Đổi tên title --><title>Green Energy Game</title>
+    <!-- Tải Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Đảm bảo chiều cao đầy đủ */
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Tránh cuộn trang */
+        }
+        
+        #game-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            /* THÊM MỚI: Bố cục cột cho mobile, bố cục hàng cho desktop */
+            flex-direction: column;
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+             #game-container {
+                flex-direction: row;
+             }
+        }
+
+        /* Màn hình A (Khu vực mô hình) */
+        #model-a {
+            /* CẬP NHẬT: Kích thước cho mobile và desktop */
+            width: 100%;
+            height: 60%; /* 60% chiều cao trên mobile */
+            background-color: #D1D5DB; /* Gray-500 (Xám đậm mặc định - Khi chưa có mặt trời) */
+            background-size: cover;
+            background-position: center;
+            position: relative; /* Quan trọng để định vị các item con */
+            transition: background-color 0.5s ease;
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+             #model-a {
+                width: 80%; /* w-4/5 */
+                height: 100%; /* h-full */
+             }
+        }
+        
+        /* CẬP NHẬT: Nền xanh lá khi có mặt trời và không bị che */
+        #model-a.sun-present-bg {
+            background-color: #D1FAE5; /* Green-100 (Xanh lá sáng) */
+        }
+        
+        /* THÊM MỚI: Nền khi mặt trời bị mây che */
+        #model-a.sky-partly-cloudy {
+             background-color: #A3E6B4; /* Xanh lá nhạt pha xám (tùy chỉnh) */
+        }
+
+
+        /* Lớp SVG để vẽ dây dẫn (Nằm dưới các công cụ) */
+        #wire-svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10; /* Nằm dưới các công cụ (z-index 20) */
+            pointer-events: none; /* Cho phép click xuyên qua */
+        }
+        
+        /* Dây tạm thời khi đang kéo */
+        #temp-wire {
+            stroke: #FDE047; /* Vàng sáng */
+            stroke-width: 4;
+            stroke-dasharray: 8, 8;
+            fill: none;
+        }
+        
+        /* Dây vĩnh viễn sau khi thả */
+        .permanent-wire {
+            stroke: #22C55E; /* Green-500 (Màu xanh lá) */
+            stroke-width: 5;
+            fill: none;
+            stroke-linecap: round;
+            pointer-events: none;
+        }
+        
+        /* CSS CHO HIỆU ỨNG DÂY DẪN "HOẠT ĐỘNG" (NÉT ĐỨT CHẠY) */
+        @keyframes flow-animation {
+            from { stroke-dashoffset: 0; }
+            to { stroke-dashoffset: 20; } /* Điều chỉnh tốc độ chạy */
+        }
+        
+        /* Màu vàng cam mặc định cho dây active (nguồn) */
+        .permanent-wire.wire-active {
+            stroke: #F59E0B; /* Màu vàng cam */
+            stroke-dasharray: 10, 10; /* Nét đứt */
+            /* Animation mặc định chạy từ END về START */
+            animation: flow-animation 1s linear infinite;
+        }
+        
+        /* CẬP NHẬT: Màu đỏ cho dây đèn active */
+        .permanent-wire.light-wire-active {
+             stroke: #EF4444; /* Red-500 */
+        }
+        
+        /* Đảo ngược hướng chạy (thành START về END) */
+        .permanent-wire.wire-active.wire-reversed {
+            animation-direction: reverse;
+        }
+        
+        /* Màn hình B (Hộp công cụ) */
+        #tools-b {
+            /* CẬP NHẬT: Kích thước cho mobile và desktop */
+            width: 100%;
+            height: 40%; /* 40% chiều cao trên mobile */
+            background-color: #78350F; /* Màu gỗ tối (yellow-800) */
+            border-top: 8px solid #451A03; /* Đổi viền sang top */
+            border-left: none; /* Xóa viền trái */
+            box-shadow: 0 -10px 20px rgba(0,0,0,0.3) inset; /* Đổi bóng lên trên */
+            /* CẬP NHẬT: Cho phép cuộn y */
+            overflow-y: auto;
+            padding: 1rem; /* p-4 */
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr)); /* grid-cols-2 */
+            gap: 1rem; /* gap-4 */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+             #tools-b {
+                width: 20%; /* w-1/5 */
+                height: 100%; /* h-full */
+                border-left: 8px solid #451A03; /* Trả lại viền trái */
+                border-top: none; /* Xóa viền trên */
+                box-shadow: -10px 0 20px rgba(0,0,0,0.3) inset; /* Trả lại bóng bên trái */
+             }
+        }
+
+        /* Ô chứa công cụ */
+        .tool-cell {
+            background-color: #92400E; /* Màu gỗ sáng hơn (yellow-700) */
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2) inset;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative; /* Cần cho dấu cấm */
+        }
+        
+        /* CSS cho chế độ Dây dẫn */
+        body.wiring-mode {
+            cursor: crosshair; /* Hình dấu + */
+        }
+
+        /* Ô công cụ khi được chọn (Dây dẫn) */
+        .tool-cell.active-tool {
+            background-color: #34D399; /* Green-400 */
+            box-shadow: 0 0 15px #10B981 inset; /* Hiệu ứng phát sáng */
+        }
+
+        /* Công cụ (trong hộp) */
+        .tool-item {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: grab;
+            transition: transform 0.2s ease;
+            font-size: 50px; /* Kích thước cho Emoji */
+            position: relative; /* Cần cho dấu cấm */
+        }
+        
+        .tool-item:hover {
+            transform: scale(1.1);
+        }
+        
+        .tool-item .svg-icon {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* THÊM MỚI: Dấu cấm cho công cụ đã dùng */
+        .tool-item.tool-prohibited {
+            cursor: not-allowed; /* Đổi con trỏ */
+            opacity: 0.6; /* Làm mờ đi */
+        }
+        .tool-item.tool-prohibited::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 20px;
+            height: 20px;
+            background-color: #EF4444; /* Red-500 */
+            border-radius: 50%;
+            border: 2px solid white;
+            z-index: 1; /* Nằm trên công cụ */
+        }
+         .tool-item.tool-prohibited::after {
+            content: '';
+            position: absolute;
+            top: 13px; /* Điều chỉnh vị trí gạch chéo */
+            left: 7px;
+            width: 16px;
+            height: 4px; /* Độ dày gạch chéo */
+            background-color: white;
+            transform: rotate(45deg);
+            z-index: 2; /* Nằm trên vòng tròn */
+        }
+
+
+        /* Công cụ đã được thả (trên màn hình A) */
+        .cloned-item {
+            position: absolute;
+            z-index: 20;
+            /* CẬP NHẬT: Kích thước cơ sở responsive */
+            width: 60px; 
+            height: 60px;
+            font-size: 38px; /* Giảm cỡ emoji 1 chút */
+            cursor: grab;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Thêm transition để di chuyển mượt mà khi "snap" */
+            transition: left 0.3s ease, top 0.3s ease;
+        }
+         @media (min-width: 768px) { /* md breakpoint */
+            .cloned-item {
+                 width: 80px;
+                 height: 80px;
+                 font-size: 50px;
+            }
+         }
+        
+        .cloned-item .svg-icon {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .cloned-item:active {
+            cursor: grabbing;
+            transition: none; /* Tắt transition khi đang kéo */
+        }
+
+        /* Trạng thái khi đang kéo (cả bản sao và bản gốc) */
+        .dragging {
+            position: absolute; /* Phải là absolute để di chuyển tự do */
+            z-index: 1000; /* Luôn nổi lên trên cùng */
+            pointer-events: none; /* Không cản trở sự kiện mouseup */
+            opacity: 0.9;
+            transition: none; /* Tắt transition khi đang kéo */
+        }
+
+        /* CSS CHO ANIMATION QUAY */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Đặt tâm quay cho các cánh quạt (dựa trên viewBox 100x100, tâm ở 50, 35) */
+        .turbine-blades {
+            transform-origin: 50% 35%;
+        }
+
+        /* Áp dụng animation khi item có class 'spinning' */
+        .cloned-item.spinning .turbine-blades {
+            animation: spin 2s linear infinite;
+        }
+        
+        /* === CSS PIN MẶT TRỜI === */
+        
+        /* Kiểu cell pin mặt trời (màu xanh dương đậm) */
+        .solar-cell {
+            fill: #1E3A8A; /* blue-900 (Xanh dương đậm) */
+            transition: fill 0.2s ease;
+        }
+
+        /* Animation nhấp nháy Vàng <-> Xanh */
+        @keyframes solar-blink {
+            0%, 100% { fill: #1E3A8A; } /* Xanh dương đậm */
+            50% { fill: #F59E0B; }      /* Vàng cam (giống màu dây) */
+        }
+
+        /* Khi mặt trời active, áp dụng animation cho các cell */
+        .cloned-item.solar-active .solar-cell {
+            /* step-end giúp animation "nhảy" màu, không bị mờ */
+            animation: solar-blink 1s infinite step-end;
+        }
+
+        /* Tạo hiệu ứng "tự do" (nhấp nháy ngẫu nhiên) bằng cách delay khác nhau */
+        .cloned-item.solar-active .solar-cell:nth-child(3n+1) {
+            animation-delay: -0.2s;
+        }
+        .cloned-item.solar-active .solar-cell:nth-child(3n+2) {
+            animation-delay: -0.5s;
+        }
+        .cloned-item.solar-active .solar-cell:nth-child(3n+3) {
+            animation-delay: -0.8s;
+        }
+
+        /* === CSS BÓNG ĐÈN VÀ CÔNG TẮC === */
+        
+        /* Phần thủy tinh của bóng đèn (mặc định màu xám) */
+        .bulb-glass {
+            fill: #6B7280; /* Gray-500 */
+            transition: fill 0.3s ease;
+        }
+        
+        /* Khi đèn bật, chuyển màu vàng */
+        .cloned-item.bulb-on .bulb-glass {
+            fill: #FDE047; /* Yellow-300 */
+            /* Thêm hiệu ứng phát sáng nhẹ */
+            filter: drop-shadow(0 0 10px #FDE047);
+        }
+
+        /* Cần gạt công tắc (mặc định TẮT - Đỏ, Vị trí dưới) */
+        .switch-lever {
+            fill: #EF4444; /* Red-500 */
+            transition: fill 0.2s ease, y 0.2s ease;
+            /* y="45" được đặt trong SVG */
+        }
+
+        /* Khi công tắc BẬT (thêm class .switch-on) */
+        .cloned-item.switch-on .switch-lever {
+            fill: #22C55E; /* Green-500 */
+            /* Di chuyển cần gạt lên trên (thay đổi thuộc tính y) */
+            animation: switch-on-anim 0.2s forwards;
+        }
+        
+        /* Cần animation để thay đổi 'y' vì nó là thuộc tính SVG, không phải CSS */
+        @keyframes switch-on-anim {
+            from { y: 45; }
+            to { y: 25; }
+        }
+        
+        /* Chữ (cả ON và OFF) */
+        .switch-text {
+            font-size: 14px;
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            text-anchor: middle;
+            user-select: none; /* Không cho phép chọn chữ */
+        }
+
+        /* Chữ OFF (Đỏ, ở trên, mặc định Bật) */
+        .switch-text-off {
+            fill: #EF4444;
+            display: block;
+        }
+
+        /* Chữ ON (Xanh, ở dưới, mặc định Tắt) */
+        .switch-text-on {
+            fill: #22C55E;
+            display: none;
+        }
+
+        /* Khi BẬT, hiện chữ ON, ẩn chữ OFF */
+        .cloned-item.switch-on .switch-text-on {
+            display: block;
+        }
+        .cloned-item.switch-on .switch-text-off {
+            display: none;
+        }
+
+        /* Bảng tên Tủ điện */
+        .power-box-label {
+            font-size: 8px; /* Kích thước nhỏ */
+            font-weight: bold;
+            font-family: Arial, sans-serif;
+            fill: #FFFFFF; /* Màu trắng */
+            text-anchor: middle;
+            user-select: none;
+        }
+        
+        /* CẬP NHẬT: AI Bot CSS (Di chuyển sang phải) */
+        #ai-bot {
+            position: absolute;
+            bottom: 1rem; /* 20px */
+            right: 1rem; /* 20px */
+            left: auto; /* Xóa vị trí bên trái */
+            background-color: white;
+            border-radius: 10px;
+            padding: 10px 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            flex-wrap: wrap; /* Cho phép xuống dòng */
+            align-items: center;
+            /* CẬP NHẬT: Kích thước cho mobile và desktop */
+            max-width: 280px;
+            padding: 8px;
+            z-index: 50; /* Nằm trên các item khác */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            #ai-bot {
+                max-width: 350px; /* Tăng chiều rộng */
+                padding: 10px 15px;
+            }
+        }
+
+        #ai-bot img {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+            border-radius: 50%;
+            object-fit: cover; /* Đảm bảo ảnh vừa vặn */
+            flex-shrink: 0; /* Không co lại */
+            /* CẬP NHẬT: Ẩn avatar trên mobile */
+            display: none;
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            #ai-bot img {
+                display: block;
+            }
+        }
+
+        #ai-explanation {
+            /* CẬP NHẬT: Kích thước chữ và layout cho mobile */
+            font-size: 13px;
+            color: #374151; /* Gray-700 */
+            margin: 0;
+            flex-grow: 1; /* Chiếm hết không gian còn lại */
+            margin-bottom: 8px; /* Khoảng cách với ô input */
+            width: 100%; /* Chiếm hết hàng trên trên mobile */
+            min-height: 30px; /* Đảm bảo chiều cao tối thiểu */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            #ai-explanation {
+                font-size: 14px;
+                width: calc(100% - 50px); /* Chiếm gần hết hàng trên */
+                min-height: 40px;
+            }
+        }
+         /* THÊM MỚI: Loading indicator */
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin-loader 1s linear infinite;
+            margin-left: 5px; /* Khoảng cách với text */
+        }
+        @keyframes spin-loader {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden { display: none; } /* Helper class */
+
+        #ai-input-row { /* Row cho input và button */
+             display: flex;
+             width: 100%;
+             align-items: center;
+             /* CẬP NHẬT: Căn lề cho mobile */
+             margin-left: 0;
+        }
+         @media (min-width: 768px) { /* md breakpoint */
+            #ai-input-row {
+                 margin-left: 50px; /* Căn lề với text */
+            }
+         }
+        #ai-question {
+            /* width: calc(100% - 70px); Chiều rộng trừ đi nút Gửi */
+            flex-grow: 1; /* Chiếm không gian còn lại */
+            padding: 5px 8px;
+            border: 1px solid #D1D5DB; /* Gray-300 */
+            border-radius: 5px;
+            margin-right: 5px;
+            font-size: 13px;
+         }
+         #ai-send-btn {
+            padding: 5px 10px;
+            background-color: #3B82F6; /* Blue-500 */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            flex-shrink: 0; /* Không co lại */
+        }
+         #ai-send-btn:hover {
+             background-color: #2563EB; /* Blue-600 */
+         }
+         #ai-send-btn:disabled { /* Kiểu khi đang tải */
+             background-color: #9CA3AF; /* Gray-400 */
+             cursor: not-allowed;
+         }
+         
+        /* THÊM MỚI: CSS cho Tiêu đề và Tác giả */
+        #game-title-container {
+            position: absolute;
+            top: 1rem; /* 16px */
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none; /* Cho phép click xuyên qua */
+            z-index: 30;
+            color: #2563EB; /* Blue-600 */
+            font-weight: bold;
+        }
+        .game-title {
+            /* CẬP NHẬT: Kích thước chữ cho mobile */
+            font-size: 1.2rem; /* 1.1rem * 2 = 35.2px */
+            line-height: 1.5rem; /* Điều chỉnh line height */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .game-title {
+                font-size: 2.2rem; 
+                line-height: 2.5rem;
+            }
+        }
+
+        .game-main-title {
+             /* CẬP NHẬT: Kích thước chữ cho mobile */
+            font-size: 2rem; 
+            line-height: 2.2rem;
+            color: #EF4444; /* Red-500 */
+            margin-top: 5px;
+        }
+         @media (min-width: 768px) { /* md breakpoint */
+            .game-main-title {
+                font-size: 3.75rem; 
+                line-height: 4rem;
+            }
+         }
+        
+        #author-credit-container {
+            position: absolute;
+            bottom: 1rem; /* 16px */
+            /* CẬP NHẬT: Vị trí cho mobile và desktop */
+            left: 1rem; /* 16px on mobile */
+            transform: translateX(0); /* Reset transform on mobile */
+            text-align: left; /* Align left on mobile */
+            pointer-events: none; /* Cho phép click xuyên qua */
+            z-index: 30; /* Nằm trên các item khác (ngoại trừ Bot) */
+        }
+         @media (min-width: 768px) { /* md breakpoint */
+            #author-credit-container {
+                left: 50%;
+                transform: translateX(-50%);
+                text-align: center;
+            }
+         }
+
+        .author-credit {
+             /* CẬP NHẬT: Kích thước chữ cho mobile */
+            font-size: 1rem; 
+            font-style: italic; /* Thêm lại in nghiêng */
+            color: #2563EB; /* Đổi sang màu xanh dương (Blue-600) */
+            font-weight: bold; /* Giữ in đậm */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .author-credit {
+                font-size: 1.75rem;
+            }
+         }
+
+
+    </style>
+</head>
+<body class="bg-blue-100 h-screen w-screen">
+
+    <div id="game-container">
+        
+        <!-- MÀN HÌNH A (MÔ HÌNH) -->
+        <div id="model-a" class="w-4/5 h-full">
+            <!-- Lớp SVG để vẽ dây dẫn --><svg id="wire-svg-layer"></svg>
+            <!-- Các công cụ được thả vào đây -->
+            
+            <!-- THÊM MỚI: Tiêu đề -->
+            <div id="game-title-container">
+                <p class="game-title">Ủy ban nhân dân xã Tân Thành Bình</p>
+                <p class="game-title">Trường Tiểu học Tân Thành Bình 2</p>
+                <p class="game-main-title">GREEN ENERGY HOUSE</p>
+            </div>
+            
+            <!-- THÊM MỚI: Tên tác giả -->
+            <div id="author-credit-container">
+                <p class="author-credit">Tác giả: Nguyễn Thị Thanh Quyên</p>
+            </div>
+
+            <!-- CẬP NHẬT: AI Bot với Input và Button (Đã di chuyển sang phải) -->
+            <div id="ai-bot">
+                <img src="https://placehold.co/40x40/3B82F6/FFF?text=AI" alt="AI Bot Avatar">
+                <p id="ai-explanation">Chào mừng bạn! Hãy thử lắp mạch điện nhé.</p>
+                <!-- Thêm loading indicator -->
+                <div id="ai-loader" class="loader hidden"></div>
+                <div id="ai-input-row">
+                     <input type="text" id="ai-question" placeholder="Hỏi AI về năng lượng xanh...">
+                     <button id="ai-send-btn">Gửi</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MÀN HÌNH B (HỘP CÔNG CỤ) --><div id="tools-b" class="w-1/5 h-full p-4 grid grid-cols-2 gap-4 overflow-y-auto">
+            
+            <!-- Hàng 1 --><div class="tool-cell">
+                <div class="tool-item" data-tool="sun" title="Mặt trời">☀️</div>
+            </div>
+            <div class="tool-cell">
+                <!-- Công cụ 2: Ngôi nhà (SVG) --><div class="tool-item" data-tool="house" title="Ngôi nhà">
+                    <svg class="svg-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Mái nhà (lớn, màu đỏ) --><path d="M 5 40 L 50 10 L 95 40 Z" fill="#DC2626" stroke="#451A03" stroke-width="2"/>
+                        <!-- Thân nhà (màu vàng) --><rect x="15" y="40" width="70" height="55" fill="#FBBF24" stroke="#451A03" stroke-width="2"/>
+                        <!-- Cửa --><rect id="house-door" x="40" y="60" width="20" height="35" fill="#78350F" stroke="#451A03" stroke-width="2"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Hàng 2 --><div class="tool-cell">
+                <!-- CÔNG CỤ 3: PIN MẶT TRỜI (CẬP NHẬT) -->
+                <div class="tool-item" data-tool="solar-panel" title="Pin mặt trời">
+                    <svg class="svg-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <g transform="skewX(-20) translate(15 0)">
+                            <!-- Khung ngoài (màu sẫm) -->
+                            <rect x="10" y="25" width="70" height="50" fill="#064E3B" stroke="#064E3B" stroke-width="2" />
+                            
+                            <!-- Lưới 3x4 (12 cell) -->
+                            <g>
+                                <!-- Hàng 1 -->
+                                <rect class="solar-cell" x="10.5" y="25.5" width="22.6" height="11.75"/>
+                                <rect class="solar-cell" x="33.6" y="25.5" width="22.6" height="11.75"/>
+                                <rect class="solar-cell" x="56.9" y="25.5" width="22.6" height="11.75"/>
+                                <!-- Hàng 2 -->
+                                <rect class="solar-cell" x="10.5" y="37.75" width="22.6" height="11.75"/>
+                                <rect class="solar-cell" x="33.6" y="37.75" width="22.6" height="11.75"/>
+                                <rect class="solar-cell" x="56.9" y="37.75" width="22.6" height="11.75"/>
+                                <!-- Hàng 3 -->
+                                <rect class="solar-cell" x="10.5" y="50" width="22.6" height="11.75"/>
+                                <rect class="solar-cell" x="33.6" y="50" width="22.6" height="11.75"/>
+                                <rect class="solar-cell" x="56.9" y="50" width="22.6" height="11.75"/>
+                                <!-- Hàng 4 -->
+                                <rect class="solar-cell" x="10.5" y="62.25" width="22.6" height="11.75"/>
+                                <rect class="solar-cell" x="33.6" y="62.25" width="22.6" height="11.75"/>
+                                <rect class="solar-cell" x="56.9" y="62.25" width="22.6" height="11.75"/>
+                            </g>
+                            
+                            <!-- Đường kẻ lưới màu trắng -->
+                            <g stroke="#FFF" stroke-width="0.75">
+                                <!-- Dọc -->
+                                <line x1="33.35" y1="25" x2="33.35" y2="75" />
+                                <line x1="56.65" y1="25" x2="56.65" y2="75" />
+                                <!-- Ngang -->
+                                <line x1="10" y1="37.5" x2="80" y2="37.5" />
+                                <line x1="10" y1="50" x2="80" y2="50" />
+                                <line x1="10" y1="62.5" x2="80" y2="62.5" />
+                            </g>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+            <!-- CẬP NHẬT: TUA-BIN 3 CÁNH QUẠT -->
+            <div class="tool-cell">
+                <div class="tool-item" data-tool="wind-turbine" title="Tua-bin gió">
+                    <svg class="svg-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Trụ --><path d="M48 40 L48 95 Q 48 100 45 100 L 55 100 Q 52 100 52 95 L 52 40 Z" fill="#9CA3AF"/>
+                        <!-- Nhóm cánh quạt (để xoay) --><g class="turbine-blades">
+                            <!-- Cánh 1 -->
+                            <path d="M 50 35 L 65 20 L 70 25 L 55 40 Z" fill="#F3F4F6" stroke="#9CA3AF" stroke-width="1.5" transform="rotate(0 50 35)"/>
+                            <!-- Cánh 2 -->
+                            <path d="M 50 35 L 65 20 L 70 25 L 55 40 Z" fill="#F3F4F6" stroke="#9CA3AF" stroke-width="1.5" transform="rotate(120 50 35)"/>
+                            <!-- Cánh 3 -->
+                            <path d="M 50 35 L 65 20 L 70 25 L 55 40 Z" fill="#F3F4F6" stroke="#9CA3AF" stroke-width="1.5" transform="rotate(240 50 35)"/>
+                        </g>
+                        <!-- Tâm --><circle cx="50" cy="35" r="7" fill="#6B7280" stroke="#4B5563" stroke-width="2"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Hàng 3 --><div class="tool-cell">
+                <!-- CÔNG CỤ 5: CÔNG TẮC (CẬP NHẬT) -->
+                <div class="tool-item" data-tool="switch" title="Công tắc">
+                    <svg class="svg-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="20" y="20" width="60" height="60" rx="10" fill="#E5E7EB" stroke="#4B5563" stroke-width="3"/>
+                        
+                        <!-- Chữ OFF (ở trên) -->
+                        <text x="50" y="38" class="switch-text switch-text-off">OFF</text>
+                        
+                        <!-- Cần gạt (Vị trí Y được điều khiển bằng CSS) -->
+                        <rect class="switch-lever" x="40" y="45" width="20" height="30" rx="5"/>
+
+                        <!-- Chữ ON (ở dưới) -->
+                        <text x="50" y="70" class="switch-text switch-text-on">ON</text>
+                    </svg>
+                </div>
+            </div>
+            <div class="tool-cell">
+                <!-- CÔNG CỤ 6: BÓNG ĐÈN (CẬP NHẬT) -->
+                <div class="tool-item" data-tool="light-bulb" title="Bóng đèn">
+                    <svg class="svg-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                         <!-- Đuôi đèn -->
+                        <rect x="35" y="60" width="30" height="20" fill="#9CA3AF" stroke="#4B5563" stroke-width="2"/>
+                        <rect x="38" y="80" width="24" height="5" fill="#6B7280"/>
+                         <!-- Phần thủy tinh (TẮT, màu xám) -->
+                        <circle class="bulb-glass" cx="50" cy="40" r="30" stroke="#4B5563" stroke-width="2"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Hàng 4 --><div class="tool-cell">
+                <!-- Công cụ 7: Tủ điện (CẬP NHẬT: Thêm bảng tên) --><div class="tool-item" data-tool="power-box" title="Tủ điện">
+                    <svg class="svg-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="20" y="15" width="60" height="70" rx="8" fill="#6B7280" stroke="#374151" stroke-width="3"/>
+                        <rect x="28" y="25" width="44" height="50" rx="4" fill="#D1D5DB" stroke="#4B5563" stroke-width="2"/>
+                        <circle cx="38" cy="50" r="5" fill="#EF4444"/>
+                        <circle cx="62" cy="50" r="5" fill="#22C55E"/>
+                        <!-- Bảng tên -->
+                        <text x="50" y="80" class="power-box-label">Tủ điện</text>
+                    </svg>
+                </div>
+            </div>
+            <div class="tool-cell" id="wire-tool-cell">
+                <!-- Công cụ 8: Dây dẫn điện (SVG) - Nút kích hoạt chế độ --><div class="tool-item" data-tool="wire" title="Dây dẫn điện">
+                    <svg class="svg-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M 20 20 Q 50 80 80 80" stroke="#F59E0B" stroke-width="8" fill="none" stroke-linecap="round"/>
+                        <circle cx="20" cy="20" r="10" fill="#3B82F6"/>
+                        <circle cx="80" cy="80" r="10" fill="#3B82F6"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Hàng 5 --><div class="tool-cell">
+                <div class="tool-item" data-tool="cloud" title="Đám mây">☁️</div>
+            </div>
+            <div class="tool-cell">
+                <div class="tool-item" data-tool="wind" title="Luồng gió thổi">💨</div>
+            </div>
+
+            <!-- Hàng 6 (Cập nhật) --><div class="tool-cell" style="padding: 4px;"> <!-- Thêm padding để nút đẹp hơn -->
+                <div id="undo-btn" class="tool-item" title="Hoàn tác" style="cursor: pointer; background-color: #3B82F6; color: white; font-weight: bold; font-size: 1.2rem; border-radius: 8px; border: 2px solid white; width: 100%; height: 100%;">
+                    Undo
+                </div>
+            </div>
+            <div class="tool-cell" style="padding: 4px;"> <!-- Thêm padding để nút đẹp hơn -->
+                <div id="reset-btn" class="tool-item" title="Thiết lập lại" style="cursor: pointer; background-color: #EF4444; color: white; font-weight: bold; font-size: 1.2rem; border-radius: 8px; border: 2px solid white; width: 100%; height: 100%;">
+                     Reset
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- THÊM MỚI: Audio element for TTS -->
+    <audio id="ai-audio" style="display: none;"></audio>
+
+
+    <script>
+        const dropZone = document.getElementById('model-a');
+        const toolBox = document.getElementById('tools-b');
+        const wireToolCell = document.getElementById('wire-tool-cell');
+        const wireLayer = document.getElementById('wire-svg-layer');
+        // THÊM MỚI: Lấy element AI Bot
+        const aiExplanationElement = document.getElementById('ai-explanation');
+        // THÊM MỚI: Lấy element Input, Button và Loader của AI
+        const aiQuestionInput = document.getElementById('ai-question');
+        const aiSendButton = document.getElementById('ai-send-btn');
+        const aiLoader = document.getElementById('ai-loader');
+        // THÊM MỚI: Lấy Audio element
+        const aiAudioElement = document.getElementById('ai-audio');
+        // THÊM MỚI: Nút Reset/Undo
+        const resetButton = document.getElementById('reset-btn');
+        const undoButton = document.getElementById('undo-btn');
+
+
+        let draggedItem = null;      
+        let draggedItemCopy = null; 
+        let offsetX, offsetY;
+        
+        // SỬA LỖI CLICK CÔNG TẮC: Biến theo dõi trạng thái kéo
+        let isDragging = false; // Theo dõi nếu đang kéo (kể cả clone hoặc move)
+        let isPotentialDrag = false; // Theo dõi nếu nhấn chuột (có thể là click hoặc drag)
+        
+        let isWiringMode = false; 
+
+        // WIRING VARIABLES
+        let wiringStartItem = null;
+        let tempWire = null;
+        // Danh sách các công cụ có thể tham gia nối dây
+        const wiringParticipants = ['power-box', 'solar-panel', 'wind-turbine', 'light-bulb', 'switch'];
+        // DANH SÁCH CÔNG CỤ ĐỘC QUYỀN (trừ Mây và Dây)
+        const exclusiveTools = ['sun', 'house', 'solar-panel', 'wind-turbine', 'switch', 'light-bulb', 'power-box', 'wind'];
+        
+        // BIẾN TRẠNG THÁI TOÀN CỤC (QUAN TRỌNG)
+        let isSunnyGlobal = false; // Trạng thái CÓ NẮNG (Mặt trời có VÀ không bị che)
+        
+        // THÊM MỚI: Biến cho Undo/Redo
+        let historyStack = [];
+        const MAX_HISTORY = 30; // Giới hạn 30 bước
+
+
+
+        
+        // === HÀM HỖ TRỢ ===
+        
+        // THÊM MỚI: Hàm cập nhật giải thích AI Bot
+        function updateAIExplanation(message) {
+             // Chỉ cập nhật nếu không đang tải
+             if (aiLoader.classList.contains('hidden')) {
+                aiExplanationElement.textContent = message;
+             }
+        }
+
+        function generateUUID() {
+            return 'item-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+        }
+
+        // SỬA LỖI TOUCH: Thêm hàm chuẩn hóa sự kiện
+        function getEvent(evt) {
+            return evt.touches ? evt.touches[0] : evt;
+        }
+
+        // Lấy tọa độ chuột tương đối với dropZone
+        function getMousePos(evt) {
+            // SỬA: Chuẩn hóa sự kiện chuột và chạm
+            const event = getEvent(evt); 
+            const rect = dropZone.getBoundingClientRect();
+            return {
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
+            };
+        }
+        
+        // Lấy tọa độ tâm của một công cụ (tương đối với dropZone)
+        function getCenter(element) {
+            const rect = element.getBoundingClientRect();
+            const dropZoneRect = dropZone.getBoundingClientRect();
+            // Trả về trung tâm hình học
+            return {
+                x: (rect.left + rect.right) /2 - dropZoneRect.left,
+                y: (rect.top + rect.bottom) / 2 - dropZoneRect.top
+            };
+        }
+        
+        // Lấy tọa độ điểm nối ở đáy (tương đối với dropZone)
+        function getBottomCenter(element) {
+            const rect = element.getBoundingClientRect();
+            const dropZoneRect = dropZone.getBoundingClientRect();
+            // Trả về trung tâm x, cạnh đáy y
+            return {
+                x: (rect.left + rect.right) / 2 - dropZoneRect.left,
+                y: rect.bottom - dropZoneRect.top 
+            };
+        }
+
+        // Lấy tọa độ điểm nối ở đỉnh (tương đối với dropZone)
+        function getTopCenter(element) {
+            const rect = element.getBoundingClientRect();
+            const dropZoneRect = dropZone.getBoundingClientRect();
+            // Trả về trung tâm x, cạnh đỉnh y
+            return {
+                x: (rect.left + rect.right) / 2 - dropZoneRect.left,
+                y: rect.top - dropZoneRect.top 
+            };
+        }
+        
+        // Lấy tọa độ điểm nối ở cạnh bên gần nhất (tương đối với dropZone)
+        function getClosestSideCenter(element, targetElement) {
+            const rect = element.getBoundingClientRect();
+            const dropZoneRect = dropZone.getBoundingClientRect();
+            const targetCenter = getCenter(targetElement);
+            const elementCenter = getCenter(element);
+
+            let xPos;
+            
+            // Nếu element (Item) nằm bên trái target (PBox), dùng cạnh phải của Item.
+            if (elementCenter.x < targetCenter.x) {
+                xPos = rect.right - dropZoneRect.left;
+            } else {
+                // Nếu element (Item) nằm bên phải target (PBox), dùng cạnh trái của Item.
+                xPos = rect.left - dropZoneRect.left;
+            }
+            
+            // Trả về trung tâm y, cạnh x gần nhất
+            return {
+                x: xPos,
+                y: elementCenter.y
+            };
+        }
+        
+        // HÀM HỖ TRỢ TÍNH TOÁN OVERLAP (AABB)
+        function getOverlap(rect1, rect2) {
+            const overlapLeft = Math.max(rect1.left, rect2.left);
+            const overlapRight = Math.min(rect1.right, rect2.right);
+            const overlapTop = Math.max(rect1.top, rect2.top);
+            const overlapBottom = Math.min(rect1.bottom, rect2.bottom);
+
+            if (overlapRight > overlapLeft && overlapBottom > overlapTop) {
+                return (overlapRight - overlapLeft) * (overlapBottom - overlapTop);
+            }
+            return 0; // No overlap
+        }
+
+        // === THÊM MỚI: HÀM HỖ TRỢ TTS ===
+        /**
+         * Chuyển đổi chuỗi Base64 thành ArrayBuffer.
+         * @param {string} base64 Chuỗi Base64.
+         * @returns {ArrayBuffer} Dữ liệu ArrayBuffer.
+         */
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        /**
+         * Chuyển đổi dữ liệu PCM (Int16Array) thành WAV blob.
+         * @param {Int16Array} pcmData Dữ liệu PCM.
+         * @param {number} sampleRate Tần số lấy mẫu (ví dụ: 24000).
+         * @returns {Blob | null} Dữ liệu WAV dưới dạng Blob hoặc null nếu lỗi.
+         */
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bytesPerSample = 2; // 16-bit
+            const blockAlign = numChannels * bytesPerSample;
+            const byteRate = sampleRate * blockAlign;
+            const dataSize = pcmData.length * bytesPerSample;
+            // RIFF chunk descriptor (12 bytes) + fmt sub-chunk (24 bytes) + data sub-chunk header (8 bytes) = 44 bytes header
+            const headerSize = 44;
+             // SỬA LỖI: Tính toán fileSize chính xác
+            const fileSize = headerSize + dataSize; // Total file size including header and data
+
+            // Check if pcmData length makes sense (avoid huge allocations)
+            if (pcmData.length > 5 * 1024 * 1024) { // Limit to ~10MB PCM data ~ several minutes
+                 console.error("PCM data too large, aborting WAV creation.");
+                 return null;
+            }
+             // Ensure sufficient buffer size, handle potential errors
+            let buffer;
+            try {
+                 buffer = new ArrayBuffer(fileSize);
+            } catch (e) {
+                console.error("Failed to allocate ArrayBuffer:", e);
+                return null;
+            }
+
+            // Check if buffer allocation failed (e.g., due to size) - This check might be redundant after try-catch but good for clarity
+            if (!buffer || buffer.byteLength !== fileSize) {
+                 console.error("Failed to allocate ArrayBuffer of size:", fileSize);
+                 return null;
+            }
+
+
+            const view = new DataView(buffer);
+
+            // RIFF header (Bytes 0-11)
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, fileSize - 8, true); // ChunkSize = Total file size - 8 bytes for "RIFF" and ChunkSize field
+            writeString(view, 8, 'WAVE');
+
+            // fmt chunk (Bytes 12-35)
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+            view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true); // byteRate = sampleRate * numChannels * bytesPerSample
+            view.setUint16(32, blockAlign, true); // blockAlign = numChannels * bytesPerSample
+            view.setUint16(34, bytesPerSample * 8, true); // bitsPerSample = 16
+
+            // data chunk header (Bytes 36-43)
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true); // Subchunk2Size = dataSize
+
+            // PCM data (Bytes 44 onwards)
+            let offset = 44;
+            for (let i = 0; i < pcmData.length; i++) {
+                 // Check bounds defensively, although theoretically correct now
+                 if (offset + bytesPerSample > fileSize) {
+                     console.error(`Attempting to write beyond buffer bounds at sample ${i}. Offset: ${offset}, FileSize: ${fileSize}`);
+                     break; // Stop writing further data
+                 }
+                view.setInt16(offset, pcmData[i], true);
+                offset += bytesPerSample;
+            }
+             // Optional: Check if the final offset matches the expected end of data
+            if (offset !== headerSize + dataSize) {
+                 console.warn(`Final offset ${offset} does not match expected end of data ${headerSize + dataSize}`);
+                 // Consider returning null or handling the partial data if the loop broke early
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+
+        // === HÀM QUẢN LÝ DÂY DẪN ===
+
+        /**
+         * Xóa tất cả các dây dẫn được nối với một công cụ (dựa trên itemId)
+         * @param {string} itemId ID của công cụ bị xóa.
+         */
+        function removeWires(itemId) {
+            const wires = Array.from(wireLayer.querySelectorAll('.permanent-wire'));
+            wires.forEach(wire => {
+                if (wire.dataset.startId === itemId || wire.dataset.endId === itemId) {
+                    wire.remove();
+                }
+            });
+        }
+        
+        /**
+         * KIỂM TRA XEM CÔNG TẮC/ĐÈN CÓ ĐƯỢC NỐI DÂY KHÔNG
+         */
+        function isItemWired(item) {
+            if (!item) return false;
+            const itemId = item.dataset.itemId;
+            const wire = wireLayer.querySelector(`.permanent-wire[data-start-id="${itemId}"], .permanent-wire[data-end-id="${itemId}"]`);
+            return !!wire; // Trả về true nếu tìm thấy dây, ngược lại false
+        }
+
+        /**
+         * Tính toán đường đi (path D) cho dây dẫn dựa trên loại công cụ
+         * @param {Element} startEl 
+         * @param {Element} endEl 
+         * @returns {string} Chuỗi d của SVG path
+         */
+        function calculateWirePath(startEl, endEl) {
+            // Thêm kiểm tra null phòng trường hợp 1 trong 2 bị thiếu
+            if (!startEl || !endEl) return ""; 
+
+            const startType = startEl.dataset.tool;
+            const endType = endEl.dataset.tool;
+            let pathD;
+
+            // KIỂM TRA KẾT NỐI ĐẶC BIỆT
+            const isTurbineConnection = (startType === 'power-box' && endType === 'wind-turbine') || 
+                                       (startType === 'wind-turbine' && endType === 'power-box');
+            
+            const isSolarConnection = (startType === 'power-box' && endType === 'solar-panel') || 
+                                      (startType === 'solar-panel' && endType === 'power-box');
+                                      
+            const isSwitchConnection = (startType === 'power-box' && endType === 'switch') ||
+                                       (startType === 'switch' && endType === 'power-box');
+                                       
+            const isLightBulbConnection = (startType === 'power-box' && endType === 'light-bulb') ||
+                                          (startType === 'light-bulb' && endType === 'power-box');
+
+            if (isTurbineConnection) {
+                // LOGIC NỐI DÂY TUA-BIN GÓC VUÔNG (Tủ điện <-> Tua-bin)
+                const PBox = startType === 'power-box' ? startEl : endEl;
+                const Turbine = startType === 'wind-turbine' ? startEl : endEl;
+                const S = getBottomCenter(PBox); 
+                const E = getBottomCenter(Turbine);
+                const commonY = Math.max(S.y, E.y) + 15; // Điểm chung dưới "mặt đất"
+                pathD = `M ${S.x} ${S.y} L ${S.x} ${commonY} L ${E.x} ${commonY} L ${E.x} ${E.y}`;
+                
+            } else if (isSolarConnection) {
+                 // LOGIC NỐY DÂY PIN MẶT TRỜI GÓC VUÔNG (Horizontal then Vertical)
+                const PBox = startType === 'power-box' ? startEl : endEl;
+                const Solar = startType === 'solar-panel' ? startEl : endEl;
+                const P1 = getClosestSideCenter(Solar, PBox); // Cạnh bên Pin mặt trời
+                const P4 = getTopCenter(PBox); // Đỉnh Tủ điện
+                const P2 = { x: P4.x, y: P1.y }; // Điểm rẽ góc 90 độ
+                pathD = `M ${P1.x} ${P1.y} L ${P2.x} ${P2.y} L ${P4.x} ${P4.y}`;
+
+            } else if (isSwitchConnection) {
+                // CẬP NHẬT: LOGIC NỐI DÂY CÔNG TẮC (Giống Tua-bin)
+                const PBox = startType === 'power-box' ? startEl : endEl;
+                const Switch = startType === 'switch' ? startEl : endEl;
+                const S = getBottomCenter(PBox); 
+                const E = getBottomCenter(Switch);
+                const commonY = Math.max(S.y, E.y) + 15; // Điểm chung dưới "mặt đất"
+                pathD = `M ${S.x} ${S.y} L ${S.x} ${commonY} L ${E.x} ${commonY} L ${E.x} ${E.y}`;
+                
+            } else if (isLightBulbConnection) {
+                // LOGIC NỐI DÂY BÓNG ĐÈN GÓC VUÔNG (Horizontal then Vertical)
+                const PBox = startType === 'power-box' ? startEl : endEl;
+                const LightBulb = startType === 'light-bulb' ? startEl : endEl;
+                const P1 = getBottomCenter(LightBulb); // Đáy Bóng đèn
+                const P4 = getTopCenter(PBox); // Đỉnh Tủ điện
+                const P2 = { x: P4.x, y: P1.y }; // Điểm rẽ góc 90 độ
+                pathD = `M ${P1.x} ${P1.y} L ${P2.x} ${P2.y} L ${P4.x} ${P4.y}`;
+
+            } else {
+                // LOGIC MẶC ĐỊNH cho các kết nối khác (Bezier curve)
+                const startPos = getCenter(startEl);
+                const endPos = getCenter(endEl);
+                pathD = `M ${startPos.x} ${startPos.y} Q ${startPos.x} ${endPos.y} ${endPos.x} ${endPos.y}`;
+            }
+            
+            return pathD;
+        }
+
+        // VẼ DÂY VĨNH VIỄN
+        function createPermanentWire(startEl, endEl) {
+            const startId = startEl.dataset.itemId;
+            const endId = endEl.dataset.itemId;
+            
+            const pathD = calculateWirePath(startEl, endEl);
+            
+            const wire = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            wire.setAttribute('class', 'permanent-wire');
+            wire.dataset.startId = startId;
+            wire.dataset.endId = endId;
+            wire.setAttribute('d', pathD);
+            
+            wireLayer.prepend(wire); 
+            // THÊM MỚI: AI Bot giải thích
+             const explanation = `Đã nối dây giữa ${startEl.title} và ${endEl.title}.`;
+             updateAIExplanation(explanation);
+             callTTSAPI(explanation); // Gọi TTS
+        }
+
+        /**
+         * Cập nhật tất cả các dây dẫn được nối với một công cụ đang di chuyển
+         * @param {string} itemId ID của công cụ đang di chuyển
+         */
+        function updateConnectedWires(itemId) {
+            const wires = Array.from(wireLayer.querySelectorAll('.permanent-wire'));
+            const movingItem = document.querySelector(`[data-item-id="${itemId}"]`);
+            if (!movingItem) return;
+
+            wires.forEach(wire => {
+                let startEl, endEl;
+                
+                if (wire.dataset.startId === itemId) {
+                    startEl = movingItem;
+                    endEl = document.querySelector(`[data-item-id="${wire.dataset.endId}"]`);
+                } else if (wire.dataset.endId === itemId) {
+                    startEl = document.querySelector(`[data-item-id="${wire.dataset.startId}"]`);
+                    endEl = movingItem;
+                } else {
+                    return; // Bỏ qua nếu dây không liên quan
+                }
+
+                if (startEl && endEl) {
+                    const newPathD = calculateWirePath(startEl, endEl);
+                    wire.setAttribute('d', newPathD);
+                }
+            });
+        }
+        
+        // === HÀM QUẢN LÝ TRẠNG THÁI MÔ PHỎNG ===
+        
+        // THÊM MỚI: Biến lưu trữ tin nhắn cuối cùng để tránh lặp lại
+        let lastAIMessage = "";
+        
+        /**
+         * HÀM CHỦ: Cập nhật toàn bộ trạng thái mô phỏng
+         * Đây là hàm điều khiển chính, gọi các hàm con theo thứ tự.
+         */
+        function updateAllSimulationStates(actionContext = null) { // Thêm context để biết hành động
+            // 1. Cập nhật trạng thái có nắng (Mặt trời có & không bị che) và màu nền
+            const previouslySunny = isSunnyGlobal; // Lưu trạng thái trước đó
+            isSunnyGlobal = checkSunAndCloudsAndUpdateBackground();
+            
+            // 2. Cập nhật Pin mặt trời (dựa vào isSunnyGlobal)
+            updateSolarPanelState(isSunnyGlobal);
+            
+            // 3. Cập nhật Gió (Tua-bin quay)
+            const wasSpinning = !!document.querySelector('#model-a [data-tool="wind-turbine"].spinning'); // Lưu trạng thái trước đó
+            updateWindAnimation();
+            const isSpinning = !!document.querySelector('#model-a [data-tool="wind-turbine"].spinning');
+            
+            // 4. Cập nhật Đèn (dựa vào Pin, Gió, Công tắc)
+            const wasLightOn = !!document.querySelector('#model-a [data-tool="light-bulb"].bulb-on'); // Lưu trạng thái trước đó
+            updateLightBulbState();
+             const isLightOnNow = !!document.querySelector('#model-a [data-tool="light-bulb"].bulb-on');
+            
+            // 5. Cập nhật Dây dẫn (dựa vào Pin, Gió, VÀ TRẠNG THÁI ĐÈN)
+            updatePowerGrid(); 
+            
+            // 6. Cập nhật trạng thái Hộp công cụ
+            updateToolboxAvailability();
+            
+            // 7. CẬP NHẬT AI Bot (Chỉ khi không có hành động nào khác đang được giải thích)
+            if (actionContext === null) {
+                 if (!isDragging && !isWiringMode && wiringStartItem === null && aiLoader.classList.contains('hidden')) {
+                    let explanation = ""; // Biến lưu giải thích
+                    if (previouslySunny !== isSunnyGlobal) {
+                         explanation = isSunnyGlobal ? "Mặt trời đang chiếu sáng! Tấm pin năng lượng đang tạo ra điện." : "Trời không còn nắng (do mây che hoặc không có mặt trời). Tấm pin năng lượng ngừng hoạt động.";
+                    } else if (wasSpinning !== isSpinning) {
+                         explanation = isSpinning ? "Có gió thổi! Tua-bin gió đang quay và tạo ra điện." : "Gió đã ngừng thổi. Tua-bin gió dừng lại và không tạo ra điện nữa.";
+                    } else if (wasLightOn !== isLightOnNow) {
+                        if (isLightOnNow) {
+                            // Logic giải thích NGUYÊN LÝ đèn sáng
+                            const isWiredTurbineSpinning = !!document.querySelector('#model-a [data-tool="wind-turbine"].spinning') && isItemWired(document.querySelector('#model-a [data-tool="wind-turbine"]'));
+                            const isWiredSolarActive = isSunnyGlobal && !!document.querySelector('#model-a [data-tool="solar-panel"]') && isItemWired(document.querySelector('#model-a [data-tool="solar-panel"]'));
+
+                            if (isWiredTurbineSpinning && isWiredSolarActive) {
+                                explanation = "Đèn đã sáng! Hệ thống đang dùng cả năng lượng mặt trời và năng lượng gió.";
+                            } else if (isWiredSolarActive) {
+                                explanation = "Đèn đã sáng! Pin mặt trời đang chuyển đổi ánh nắng thành điện để thắp sáng đèn.";
+                            } else if (isWiredTurbineSpinning) {
+                                explanation = "Đèn đã sáng! Tua-bin đang dùng sức gió để tạo ra điện thắp sáng đèn.";
+                            } else {
+                                explanation = "Đèn đã sáng!"; // Fallback
+                            }
+                        } else {
+                             explanation = "Đèn đã tắt. Kiểm tra lại nguồn điện, dây dẫn và công tắc nhé.";
+                        }
+                    }
+                    
+                    // Chỉ cập nhật và đọc nếu có giải thích mới
+                    if (explanation && explanation !== lastAIMessage) {
+                        updateAIExplanation(explanation);
+                        callTTSAPI(explanation); 
+                        lastAIMessage = explanation;
+                    }
+                }
+            }
+        }
+        
+        /**
+         * 1. Kiểm tra Mặt trời, Mây che, cập nhật nền trời và trạng thái isSunnyGlobal
+         * @returns {boolean} Trả về true nếu CÓ NẮNG (Mặt trời có VÀ không bị che)
+         */
+        function checkSunAndCloudsAndUpdateBackground() {
+            const sun = document.querySelector('#model-a [data-tool="sun"]');
+            const clouds = document.querySelectorAll('#model-a [data-tool="cloud"]');
+            
+            let isSunny = false; // Mặc định là không có nắng
+            
+            if (sun) {
+                // CÓ công cụ mặt trời
+                
+                // Kiểm tra mây che
+                const sunRect = sun.getBoundingClientRect();
+                const sunArea = (sunRect.right - sunRect.left) * (sunRect.bottom - sunRect.top);
+                let totalOverlap = 0;
+
+                clouds.forEach(cloud => {
+                    const cloudRect = cloud.getBoundingClientRect();
+                    totalOverlap += getOverlap(sunRect, cloudRect);
+                });
+
+                // Nếu không bị che quá 50% -> CÓ NẮNG và nền xanh lá sáng
+                if (totalOverlap <= (sunArea * 0.5)) {
+                    isSunny = true;
+                    dropZone.classList.add('sun-present-bg');
+                    dropZone.classList.remove('sky-partly-cloudy');
+                } else {
+                    // Bị che -> KHÔNG có nắng và nền xanh lá pha xám
+                    isSunny = false;
+                    dropZone.classList.remove('sun-present-bg');
+                    dropZone.classList.add('sky-partly-cloudy');
+                    // updateAIExplanation("Mây đang che mặt trời, pin mặt trời không hoạt động."); // Di chuyển vào hàm chính
+                }
+                
+            } else {
+                // KHÔNG có công cụ mặt trời -> Nền xám đậm (mặc định) và không có nắng
+                dropZone.classList.remove('sun-present-bg');
+                dropZone.classList.remove('sky-partly-cloudy');
+                isSunny = false; // Không có nắng
+            }
+            
+            return isSunny; // Trả về trạng thái có nắng
+        }
+        
+        /**
+         * 2. Cập nhật trạng thái Pin mặt trời (nhấp nháy)
+         * @param {boolean} isSunny Trạng thái có nắng (đã tính toán)
+         */
+        function updateSolarPanelState(isSunny) {
+            const solarPanels = document.querySelectorAll('#model-a [data-tool="solar-panel"]');
+
+            solarPanels.forEach(panel => {
+                // Pin chỉ active khi CÓ NẮNG
+                if (isSunny) {
+                    panel.classList.add('solar-active');
+                } else {
+                    panel.classList.remove('solar-active');
+                }
+            });
+            
+            // updatePowerGrid(); // Sẽ được gọi trong hàm updateAllSimulationStates
+        }
+
+        /**
+         * 3. CẬP NHẬT ANIMATION GIÓ
+         */
+        function updateWindAnimation() {
+            const windIsPresent = !!document.querySelector('#model-a [data-tool="wind"]');
+            const turbines = document.querySelectorAll('#model-a [data-tool="wind-turbine"]');
+
+            turbines.forEach(turbine => {
+                if (windIsPresent) {
+                    turbine.classList.add('spinning');
+                } else {
+                    turbine.classList.remove('spinning');
+                }
+            });
+            
+            // updatePowerGrid(); // Sẽ được gọi trong hàm updateAllSimulationStates
+        }
+        
+        /**
+         * 4. Cập nhật trạng thái Bóng đèn (Bật/Tắt)
+         */
+        function updateLightBulbState() {
+            const lightBulbs = document.querySelectorAll('#model-a [data-tool="light-bulb"]');
+            if (lightBulbs.length === 0) return; // Không có đèn, bỏ qua
+
+            // CẬP NHẬT LOGIC: Kiểm tra nguồn CÓ DÂY
+            const turbineEl = document.querySelector('#model-a [data-tool="wind-turbine"]');
+            const solarPanelEl = document.querySelector('#model-a [data-tool="solar-panel"]');
+            
+            const isWiredTurbineSpinning = turbineEl && turbineEl.classList.contains('spinning') && isItemWired(turbineEl);
+            const isWiredSolarActive = isSunnyGlobal && solarPanelEl && isItemWired(solarPanelEl);
+            
+            const isPowerAvailable = isWiredTurbineSpinning || isWiredSolarActive;
+
+            // Kiểm tra công tắc
+            const mainSwitch = document.querySelector('#model-a [data-tool="switch"]');
+            
+            let isLightOn = false;
+            
+            // Logic đèn sáng
+            if (mainSwitch) {
+                // CÓ CÔNG TẮC: Đèn sáng = Nguồn CÓ DÂY VÀ Công tắc BẬT VÀ Công tắc CÓ DÂY
+                if (isPowerAvailable && 
+                    mainSwitch.classList.contains('switch-on') &&
+                    isItemWired(mainSwitch) ) { 
+                    
+                    isLightOn = true; 
+                }
+            } else {
+                // KHÔNG CÓ CÔNG TẮC: Đèn sáng = Nguồn CÓ DÂY
+                if (isPowerAvailable) {
+                    isLightOn = true;
+                }
+            }
+
+            // Áp dụng trạng thái cho tất cả bóng đèn (VÀ KIỂM TRA DÂY CỦA ĐÈN)
+            lightBulbs.forEach(bulb => {
+                // Đèn chỉ sáng nếu (isLightOn (đã check nguồn/công tắc/dây nguồn) VÀ chính nó (bóng đèn) CÓ DÂY)
+                if (isLightOn && isItemWired(bulb)) {
+                    bulb.classList.add('bulb-on');
+                } else {
+                    bulb.classList.remove('bulb-on');
+                }
+            });
+        }
+        
+        /**
+         * 5. Cập nhật trạng thái "hoạt động" (nét đứt) của dây dẫn
+         */
+        function updatePowerGrid() {
+            const powerBox = document.querySelector('#model-a [data-tool="power-box"]');
+            const isSunny = isSunnyGlobal; 
+
+            if (!powerBox) {
+                document.querySelectorAll('.permanent-wire').forEach(w => w.classList.remove('wire-active', 'wire-reversed', 'light-wire-active'));
+                return;
+            }
+
+            const powerBoxId = powerBox.dataset.itemId;
+            const allWires = document.querySelectorAll('.permanent-wire');
+
+            allWires.forEach(wire => {
+                const startId = wire.dataset.startId;
+                const endId = wire.dataset.endId;
+                const item1 = document.querySelector(`[data-item-id="${startId}"]`);
+                const item2 = document.querySelector(`[data-item-id="${endId}"]`);
+
+                if (!item1 || !item2) {
+                    wire.classList.remove('wire-active', 'wire-reversed', 'light-wire-active');
+                    return;
+                }
+
+                const item1Type = item1.dataset.tool;
+                const item2Type = item2.dataset.tool;
+
+                let isActive = false;
+                 // SỬA LỖI HIỆU ỨNG DÂY DẪN (Đảo ngược)
+                 // true = chạy START -> END (đảo ngược CSS), false = chạy END -> START (CSS mặc định)
+                let useReverseAnimation = false; 
+                let isLightWire = false;
+                let isSourceAtStart = false; // Biến mới: Xác định nguồn có phải là điểm bắt đầu (startId) không
+
+                // Case 1: Pin -> Tủ hoặc Tủ -> Pin
+                if ((item1Type === 'solar-panel' && item2Type === 'power-box') || 
+                    (item1Type === 'power-box' && item2Type === 'solar-panel')) {
+                    if (isSunny) { 
+                        isActive = true;
+                        isSourceAtStart = (item1Type === 'solar-panel'); // Nguồn (Pin) là Start?
+                    }
+                } 
+                // Case 2: Tua-bin -> Tủ hoặc Tủ -> Tua-bin
+                else if ((item1Type === 'wind-turbine' && item2Type === 'power-box') || 
+                           (item1Type === 'power-box' && item2Type === 'wind-turbine')) {
+                    const turbineEl = (item1Type === 'wind-turbine') ? item1 : item2;
+                    if (turbineEl.classList.contains('spinning')) {
+                        isActive = true;
+                         isSourceAtStart = (item1Type === 'wind-turbine'); // Nguồn (Tua-bin) là Start?
+                    }
+                }
+                // Case 3: Tủ -> Đèn hoặc Đèn -> Tủ
+                else if ((item1Type === 'light-bulb' && item2Type === 'power-box') || 
+                           (item1Type === 'power-box' && item2Type === 'light-bulb')) {
+                    const lightBulbEl = (item1Type === 'light-bulb') ? item1 : item2;
+                    if (lightBulbEl.classList.contains('bulb-on')) {
+                        isActive = true;
+                        isLightWire = true;
+                        isSourceAtStart = (item1Type === 'power-box'); // Nguồn (Tủ) là Start?
+                    }
+                }
+
+                // Apply classes
+                if (isActive) {
+                    wire.classList.add('wire-active');
+                    // SỬA LỖI HIỆU ỨNG DÂY DẪN: Đảo ngược logic
+                    // Animation mặc định (stroke-dashoffset 0 -> 20) chạy từ ĐIỂM CUỐI (END) về ĐIỂM ĐẦU (START) của path.
+                    // Nếu nguồn nằm ở điểm ĐẦU (isSourceAtStart = true), chúng ta cần đảo ngược animation (REVERSE) để nó chạy TỪ ĐẦU -> CUỐI.
+                    // Nếu nguồn nằm ở điểm CUỐI (isSourceAtStart = false), chúng ta KHÔNG cần đảo ngược, để nó chạy TỪ CUỐI -> ĐẦU.
+                    if (isSourceAtStart) {
+                         wire.classList.add('wire-reversed'); // Reverse: START -> END
+                    } else {
+                         wire.classList.remove('wire-reversed'); // Normal: END -> START
+                    }
+
+                    if (isLightWire) {
+                        wire.classList.add('light-wire-active');
+                    } else {
+                        wire.classList.remove('light-wire-active');
+                    }
+                } else {
+                    wire.classList.remove('wire-active', 'wire-reversed', 'light-wire-active');
+                }
+            });
+        }
+        
+        /**
+         * 6. Cập nhật trạng thái Hộp công cụ (Thêm dấu cấm)
+         */
+         function updateToolboxAvailability() {
+             const toolboxItems = toolBox.querySelectorAll('.tool-item');
+             toolboxItems.forEach(item => {
+                 const toolType = item.dataset.tool;
+                 // Bỏ qua dây dẫn và đám mây
+                 if (toolType === 'wire' || toolType === 'cloud') {
+                     item.classList.remove('tool-prohibited'); // Đảm bảo chúng không bao giờ bị cấm
+                     return;
+                 }
+                 
+                 // Kiểm tra xem công cụ có tồn tại trên màn hình A không
+                 const itemExistsOnScreen = !!dropZone.querySelector(`.cloned-item[data-tool="${toolType}"]`);
+                 
+                 if (itemExistsOnScreen) {
+                     item.classList.add('tool-prohibited');
+                 } else {
+                     item.classList.remove('tool-prohibited');
+                 }
+             });
+         }
+         
+        /**
+         * 7. THÊM MỚI: Cung cấp gợi ý cho bước tiếp theo
+         */
+        function provideNextStepGuidance() {
+            // Đừng đưa ra gợi ý nếu đang tải hoặc đang nối dây
+            if (!aiLoader.classList.contains('hidden') || isWiringMode || wiringStartItem) return;
+
+            const house = document.querySelector('#model-a [data-tool="house"]');
+            const powerBox = document.querySelector('#model-a [data-tool="power-box"]');
+            const solarPanel = document.querySelector('#model-a [data-tool="solar-panel"]');
+            const turbine = document.querySelector('#model-a [data-tool="wind-turbine"]');
+            const lightBulb = document.querySelector('#model-a [data-tool="light-bulb"]');
+            const mainSwitch = document.querySelector('#model-a [data-tool="switch"]');
+
+            let guidance = "";
+
+            if (!house) {
+                guidance = "Hãy bắt đầu bằng cách kéo 'Ngôi nhà' vào màn hình.";
+            } else if (!powerBox) {
+                guidance = "Tốt lắm! Bây giờ hãy kéo 'Tủ điện' để gắn vào ngôi nhà.";
+            } else if (!solarPanel && !turbine) {
+                guidance = "Tiếp theo, chúng ta cần nguồn điện. Hãy thử kéo 'Pin mặt trời' hoặc 'Tua-bin gió'.";
+            } else if (solarPanel && !isItemWired(solarPanel)) {
+                guidance = "Giờ hãy dùng 'Dây dẫn' để nối 'Pin mặt trời' với 'Tủ điện'.";
+            } else if (turbine && !isItemWired(turbine)) {
+                guidance = "Giờ hãy dùng 'Dây dẫn' để nối 'Tua-bin gió' với 'Tủ điện'.";
+            } else if (!lightBulb) {
+                guidance = "Hệ thống đã có dây nguồn. Hãy kéo 'Bóng đèn' vào nhà.";
+            } else if (!isItemWired(lightBulb)) {
+                guidance = "Gần xong rồi! Dùng 'Dây dẫn' để nối 'Tủ điện' với 'Bóng đèn'.";
+            } else if (!mainSwitch) {
+                guidance = "Bạn có thể thêm 'Công tắc' để điều khiển đèn. Đừng quên nối dây cho nó nhé.";
+            } else if (!isItemWired(mainSwitch)) {
+                 guidance = "Đừng quên nối dây cho 'Công tắc' vào 'Tủ điện'.";
+            } else if (!isSunnyGlobal && !document.querySelector('#model-a [data-tool="wind-turbine"].spinning')) {
+                 guidance = "Mạch đã hoàn tất! Giờ hãy thêm 'Mặt trời' (cho pin) hoặc 'Gió' (cho tua-bin) để tạo điện.";
+            } else if (mainSwitch && !mainSwitch.classList.contains('switch-on')) {
+                 guidance = "Mọi thứ đã sẵn sàng! Hãy nhấn vào 'Công tắc' để bật đèn.";
+            } else if (lightBulb && lightBulb.classList.contains('bulb-on')) {
+                 guidance = "Làm tốt lắm! Bạn đã thắp sáng ngôi nhà bằng năng lượng xanh!";
+            } else {
+                guidance = "Bạn đã hoàn thành một mạch điện cơ bản! Hãy thử thêm mây để xem điều gì xảy ra.";
+            }
+            
+            // Chỉ cập nhật và đọc nếu lời khuyên khác với lời giải thích cuối cùng
+            if (guidance && guidance !== lastAIMessage) {
+                updateAIExplanation(guidance);
+                callTTSAPI(guidance);
+                lastAIMessage = guidance; // Lưu lại để tránh lặp
+            }
+        }
+
+
+        
+        // === HÀM TỰ ĐỘNG GẮN (SNAP) ===
+        
+        /**
+         * HÀM CHỦ MỚI: Gọi tất cả các hàm snap
+         */
+        function updateAllSnapPositions() {
+            // Dùng setTimeout để đảm bảo vị trí Ngôi nhà được cập nhật
+            // trước khi gắn các vật thể khác vào
+            setTimeout(() => {
+                snapPowerBoxToHouse();
+                snapSolarPanelToHouse();
+                snapSwitchToHouse(); // THÊM MỚI
+                snapLightBulbToHouse(); // THÊM MỚI
+            }, 0); // 0ms delay, chỉ để đẩy vào cuối hàng đợi thực thi
+        }
+
+        /**
+         * HÀM SNAP: Tự động gắn Tủ điện (power-box) vào Ngôi nhà (house)
+         */
+        function snapPowerBoxToHouse() {
+            const house = document.querySelector('#model-a [data-tool="house"]');
+            const powerBox = document.querySelector('#model-a [data-tool="power-box"]');
+
+            // Chỉ thực hiện khi cả hai tồn tại
+            if (house && powerBox) {
+                // Lấy kích thước và vị trí style (đã được đặt bằng px)
+                const houseTop = parseFloat(house.style.top);
+                const houseLeft = parseFloat(house.style.left);
+                const houseHeight = parseFloat(house.style.height);
+                
+                const powerBoxHeight = parseFloat(powerBox.style.height);
+                const powerBoxWidth = parseFloat(powerBox.style.width);
+
+                // Tính toán vị trí mới
+                // ĐIỀU CHỈNH: Gắn vào "chân mép tường" (dưới cùng bên trái)
+                // Đặt Y: Gần đáy nhà (houseTop + houseHeight) trừ đi chiều cao Tủ điện, và 1 khoảng đệm nhỏ (10px)
+                let targetY = houseTop + houseHeight - powerBoxHeight - 10; 
+                let targetX = houseLeft + 5; // Đặt Tủ điện cách mép trái Ngôi nhà 5px (bên trong)
+
+                // Giới hạn trong màn hình
+                targetX = Math.max(0, Math.min(targetX, dropZone.clientWidth - powerBoxWidth));
+                targetY = Math.max(0, Math.min(targetY, dropZone.clientHeight - powerBoxHeight));
+                
+                // Di chuyển Tủ điện
+                powerBox.style.left = `${targetX}px`;
+                powerBox.style.top = `${targetY}px`;
+
+                // Cập nhật dây dẫn của Tủ điện sau khi nó di chuyển
+                if (powerBox.dataset.itemId) {
+                    setTimeout(() => {
+                         updateConnectedWires(powerBox.dataset.itemId);
+                    }, 300); // 300ms khớp với 'transition' trong CSS
+                }
+            }
+        }
+        
+        /**
+         * HÀM SNAP: Tự động gắn Pin mặt trời (solar-panel) vào Ngôi nhà (house)
+         */
+        function snapSolarPanelToHouse() {
+            const house = document.querySelector('#model-a [data-tool="house"]');
+            const solarPanel = document.querySelector('#model-a [data-tool="solar-panel"]');
+
+            // Chỉ thực hiện khi cả hai tồn tại
+            if (house && solarPanel) {
+                const houseTop = parseFloat(house.style.top);
+                const houseLeft = parseFloat(house.style.left);
+                const houseWidth = parseFloat(house.style.width);
+                const houseHeight = parseFloat(house.style.height); // houseHeight is 320px
+                
+                const solarPanelWidth = parseFloat(solarPanel.style.width); // solarPanel width is 160px
+                const solarPanelHeight = parseFloat(solarPanel.style.height); // solarPanel height is 160px
+
+                // Tính toán vị trí mới
+                // Đặt vào giữa mái nhà
+                // Mái nhà (từ 10% đến 40% chiều cao của SVG)
+                let targetX = houseLeft + (houseWidth / 2) - (solarPanelWidth / 2);
+                // Đặt nó ở khoảng 15% từ đỉnh của SVG nhà
+                let targetY = houseTop + (houseHeight * 0.15) - (solarPanelHeight / 2);
+
+                // Giới hạn trong màn hình
+                targetX = Math.max(0, Math.min(targetX, dropZone.clientWidth - solarPanelWidth));
+                targetY = Math.max(0, Math.min(targetY, dropZone.clientHeight - solarPanelHeight));
+                
+                // Di chuyển Pin mặt trời
+                solarPanel.style.left = `${targetX}px`;
+                solarPanel.style.top = `${targetY}px`;
+
+                // Cập nhật dây dẫn của Pin mặt trời sau khi nó di chuyển
+                if (solarPanel.dataset.itemId) {
+                    setTimeout(() => {
+                         updateConnectedWires(solarPanel.dataset.itemId);
+                    }, 300); // 300ms khớp với 'transition'
+                }
+            }
+        }
+        
+        /**
+         * HÀM SNAP: Tự động gắn Công tắc (switch) vào Ngôi nhà (house)
+         */
+        function snapSwitchToHouse() {
+            const house = document.querySelector('#model-a [data-tool="house"]');
+            const mainSwitch = document.querySelector('#model-a [data-tool="switch"]');
+
+            if (house && mainSwitch) {
+                const houseTop = parseFloat(house.style.top);
+                const houseLeft = parseFloat(house.style.left);
+                const houseHeight = parseFloat(house.style.height); // 320px
+                const houseWidth = parseFloat(house.style.width); // 320px
+
+                const switchWidth = parseFloat(mainSwitch.style.width); // 80px
+                const switchHeight = parseFloat(mainSwitch.style.height); // 80px
+                
+                // Cửa (theo SVG): x="40", y="60", width="20", height="35"
+                // (Tỷ lệ 0-100)
+                const doorLeftRatio = 40 / 100;
+                const doorTopRatio = 60 / 100;
+                const doorHeightRatio = 35 / 100;
+                const doorWidthRatio = 20 / 100; // Thêm chiều rộng cửa
+                
+                // Vị trí cửa (đã scale)
+                const doorLeftPx = houseLeft + (houseWidth * doorLeftRatio);
+                const doorTopPx = houseTop + (houseHeight * doorTopRatio);
+                const doorHeightPx = houseHeight * doorHeightRatio;
+                const doorWidthPx = houseWidth * doorWidthRatio; // Thêm chiều rộng cửa
+                
+                // CẬP NHẬT: "giữa mép phải cánh cửa"
+                let targetX = doorLeftPx + doorWidthPx + 5; // 5px bên phải cửa
+                let targetY = doorTopPx + (doorHeightPx / 2) - (switchHeight / 2); // Giữa cửa (chiều dọc)
+
+                // Giới hạn
+                targetX = Math.max(0, Math.min(targetX, dropZone.clientWidth - switchWidth));
+                targetY = Math.max(0, Math.min(targetY, dropZone.clientHeight - switchHeight));
+
+                mainSwitch.style.left = `${targetX}px`;
+                mainSwitch.style.top = `${targetY}px`;
+
+                if (mainSwitch.dataset.itemId) {
+                    setTimeout(() => {
+                         updateConnectedWires(mainSwitch.dataset.itemId);
+                    }, 300);
+                }
+            }
+        }
+        
+        /**
+         * HÀM SNAP: Tự động gắn Bóng đèn (light-bulb) vào Ngôi nhà (house)
+         */
+        function snapLightBulbToHouse() {
+            const house = document.querySelector('#model-a [data-tool="house"]');
+            const lightBulb = document.querySelector('#model-a [data-tool="light-bulb"]');
+
+            if (house && lightBulb) {
+                const houseTop = parseFloat(house.style.top);
+                const houseLeft = parseFloat(house.style.left);
+                const houseHeight = parseFloat(house.style.height); // 320px
+                const houseWidth = parseFloat(house.style.width); // 320px
+
+                const bulbWidth = parseFloat(lightBulb.style.width); // 80px
+                const bulbHeight = parseFloat(lightBulb.style.height); // 80px
+                
+                // Cửa (theo SVG): x="40", y="60", width="20"
+                const doorLeftRatio = 40 / 100;
+                const doorTopRatio = 60 / 100;
+                const doorWidthRatio = 20 / 100;
+                
+                // Vị trí cửa (đã scale)
+                const doorLeftPx = houseLeft + (houseWidth * doorLeftRatio);
+                const doorTopPx = houseTop + (houseHeight * doorTopRatio);
+                const doorWidthPx = houseWidth * doorWidthRatio;
+
+                // "phía trên cánh cửa"
+                let targetX = doorLeftPx + (doorWidthPx / 2) - (bulbWidth / 2); // Giữa cửa (chiều ngang)
+                let targetY = doorTopPx - bulbHeight - 5; // 5px phía trên cửa
+
+                // Giới hạn
+                targetX = Math.max(0, Math.min(targetX, dropZone.clientWidth - bulbWidth));
+                targetY = Math.max(0, Math.min(targetY, dropZone.clientHeight - bulbHeight));
+
+                lightBulb.style.left = `${targetX}px`;
+                lightBulb.style.top = `${targetY}px`;
+
+                if (lightBulb.dataset.itemId) {
+                    setTimeout(() => {
+                         updateConnectedWires(lightBulb.dataset.itemId);
+                    }, 300);
+                }
+            }
+        }
+
+        // === THÊM MỚI: Logic gọi Gemini API ===
+        /**
+         * Gọi Gemini API để lấy câu trả lời
+         * @param {string} userQuery Câu hỏi của người dùng
+         */
+        async function callGeminiAPI(userQuery) {
+            const apiKey = "AIzaSyDgoZBvHOXew39g7cQJzOgDE1UDlyCnt2U"; // API key sẽ được cung cấp bởi môi trường Canvas
+            const apiUrlText = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            // Thêm ngữ cảnh về game vào prompt
+            const systemPrompt = `Bạn là một AI trợ giúp trong trò chơi mô phỏng năng lượng xanh Green Energy Game. Trả lời ngắn gọn các câu hỏi của người dùng liên quan đến năng lượng mặt trời, năng lượng gió, cách hoạt động của mạch điện trong game này. Game có các công cụ: Mặt trời, Mây, Pin mặt trời, Gió, Tua-bin gió, Tủ điện, Dây dẫn, Công tắc, Bóng đèn, Ngôi nhà.`;
+
+            const payloadText = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            // Hiển thị loading
+            aiExplanationElement.textContent = "Bot đang suy nghĩ...";
+            aiLoader.classList.remove('hidden');
+            aiSendButton.disabled = true;
+            aiQuestionInput.disabled = true;
+
+            try {
+                // Gọi API tạo văn bản
+                const responseText = await fetch(apiUrlText, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadText)
+                });
+
+                if (!responseText.ok) {
+                    throw new Error(`Text API call failed with status: ${responseText.status}`);
+                }
+
+                const resultText = await responseText.json();
+                console.log("Gemini Text API Response:", resultText); // Debug log
+
+                const candidate = resultText.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    const textToSpeak = candidate.content.parts[0].text;
+                    updateAIExplanation(textToSpeak); // Hiển thị câu trả lời
+                    await callTTSAPI(textToSpeak); // Gọi TTS để đọc câu trả lời
+                } else {
+                     console.error("Unexpected Text API response structure:", resultText);
+                     updateAIExplanation("Xin lỗi, tôi gặp chút trục trặc khi xử lý yêu cầu.");
+                }
+
+            } catch (error) {
+                console.error("Error calling Gemini API:", error);
+                updateAIExplanation("Đã xảy ra lỗi khi kết nối với AI. Vui lòng thử lại sau.");
+            } finally {
+                // Ẩn loading
+                aiLoader.classList.add('hidden');
+                aiSendButton.disabled = false;
+                aiQuestionInput.disabled = false;
+            }
+        }
+
+        /**
+         * THÊM MỚI: Gọi Gemini TTS API
+         * @param {string} textToSpeak Văn bản cần đọc
+         */
+        async function callTTSAPI(textToSpeak) {
+             if (!textToSpeak) {
+                 console.warn("TTS called with empty text.");
+                 return;
+             }
+            const apiKey = "AIzaSyDgoZBvHOXew39g7cQJzOgDE1UDlyCnt2U"; // API key sẽ được cung cấp bởi môi trường Canvas
+            const apiUrlTTS = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+             // Cố gắng dừng phát âm thanh hiện tại nếu có
+             aiAudioElement.pause();
+             aiAudioElement.currentTime = 0;
+
+
+            const payloadTTS = {
+                contents: [{
+                    parts: [{ text: textToSpeak }] // Sử dụng văn bản đã được tạo
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            // Chọn giọng đọc, có thể để trống để tự động hoặc chọn giọng cụ thể
+                            // prebuiltVoiceConfig: { voiceName: "Kore" } // Ví dụ
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                const responseTTS = await fetch(apiUrlTTS, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadTTS)
+                });
+
+                if (!responseTTS.ok) {
+                    throw new Error(`TTS API call failed with status: ${responseTTS.status}`);
+                }
+
+                const resultTTS = await responseTTS.json();
+                console.log("Gemini TTS API Response:", resultTTS); // Debug log
+
+                // SỬA LỖI: Kiểm tra cấu trúc response kỹ hơn
+                const candidate = resultTTS?.candidates?.[0];
+                 if (candidate && candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                     const part = candidate.content.parts[0];
+                     // SỬA LỖI: Kiểm tra xem 'part' và 'inlineData' có tồn tại không
+                     const audioData = part?.inlineData?.data;
+                     const mimeType = part?.inlineData?.mimeType;
+
+                    if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                        // MimeType thường là audio/L16;rate=24000
+                        const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                        const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 24000; // Mặc định 24kHz
+
+                        const pcmData = base64ToArrayBuffer(audioData);
+                        // API trả về signed PCM16
+                        const pcm16 = new Int16Array(pcmData);
+                        const wavBlob = pcmToWav(pcm16, sampleRate);
+                        // Kiểm tra nếu wavBlob hợp lệ
+                        if (!wavBlob) {
+                            console.error("Failed to create WAV blob.");
+                            return;
+                        }
+                        const audioUrl = URL.createObjectURL(wavBlob);
+
+                        // SỬA LỖI: Dừng audio cũ trước khi đặt src mới
+                        aiAudioElement.pause();
+                        aiAudioElement.currentTime = 0;
+                        aiAudioElement.src = audioUrl;
+
+                        // Sử dụng setTimeout để đảm bảo src được load trước khi play
+                        setTimeout(() => {
+                             aiAudioElement.play().catch(e => console.error("Audio playback failed:", e));
+                        }, 100); // Delay 100ms
+
+                    } else {
+                        console.error("TTS API response missing audio data or mimeType:", part);
+                        // Không cần báo lỗi cho người dùng nếu chỉ TTS thất bại
+                    }
+                } else {
+                     console.error("Unexpected TTS API response structure (missing content/parts/inlineData):", resultTTS);
+                     // Không cần báo lỗi cho người dùng nếu chỉ TTS thất bại
+                }
+
+            } catch (error) {
+                 console.error("Error calling TTS API:", error);
+                 // Không cần báo lỗi cho người dùng nếu chỉ TTS thất bại
+            }
+        }
+        
+        // === THÊM MỚI: HÀM UNDO/RESET ===
+
+        /**
+         * Lưu trạng thái hiện tại của màn hình A vào history stack
+         */
+        function saveState() {
+            // Lấy HTML của tất cả items và wires
+            // Dùng innerHTML là cách đơn giản nhất để serialize
+            const itemsHTML = dropZone.innerHTML; 
+            const wiresHTML = wireLayer.innerHTML;
+            
+            // Lấy class của nền (để lưu trạng thái mây che)
+            const backgroundState = dropZone.className;
+            
+            // Chỉ lưu những phần cần thiết (bỏ qua bot và tiêu đề)
+            const items = Array.from(dropZone.querySelectorAll('.cloned-item')).map(el => el.outerHTML);
+            const wires = Array.from(wireLayer.querySelectorAll('.permanent-wire')).map(el => el.outerHTML);
+            
+            historyStack.push({
+                items: items.join(''),
+                wires: wires.join(''),
+                background: backgroundState
+            });
+            
+            // Giới hạn kích thước history
+            if (historyStack.length > MAX_HISTORY) {
+                historyStack.shift(); // Xóa trạng thái cũ nhất
+            }
+        }
+
+        /**
+         * Quay lại trạng thái trước đó
+         */
+        function undo() {
+            if (historyStack.length < 2) { // Cần ít nhất 2 trạng thái (hiện tại và trước đó)
+                const msg = "Không thể hoàn tác thêm.";
+                updateAIExplanation(msg);
+                callTTSAPI(msg);
+                return;
+            }
+            
+            // Xóa trạng thái hiện tại
+            historyStack.pop(); 
+            // Lấy trạng thái ngay trước đó
+            const lastState = historyStack[historyStack.length - 1]; 
+            
+            // Xóa bảng hiện tại
+            dropZone.querySelectorAll('.cloned-item').forEach(item => item.remove());
+            wireLayer.querySelectorAll('.permanent-wire').forEach(wire => wire.remove());
+            
+            // Khôi phục
+            dropZone.className = lastState.background;
+            dropZone.insertAdjacentHTML('beforeend', lastState.items);
+            wireLayer.insertAdjacentHTML('beforeend', lastState.wires);
+            
+            // Cập nhật lại toàn bộ mô phỏng
+            updateAllSimulationStates("undo"); // Thêm context để chặn gợi ý
+            
+            const msg = "Đã hoàn tác thao tác.";
+            updateAIExplanation(msg);
+            callTTSAPI(msg);
+        }
+
+        /**
+         * Xóa toàn bộ màn hình A và reset
+         */
+        function resetSimulation() {
+            const msg = "Đã thiết lập lại mô phỏng.";
+            updateAIExplanation(msg);
+            callTTSAPI(msg);
+            
+            // Xóa items và wires
+            dropZone.querySelectorAll('.cloned-item').forEach(item => item.remove());
+            wireLayer.querySelectorAll('.permanent-wire').forEach(wire => wire.remove());
+            
+            // Reset history
+            historyStack = []; 
+            
+            // Cập nhật trạng thái
+            updateAllSimulationStates("reset"); // Thêm context để chặn gợi ý
+            
+            // Lưu trạng thái rỗng ban đầu
+            saveState(); 
+            
+            // Gợi ý sau khi reset
+            setTimeout(provideNextStepGuidance, 1000); // 1s delay
+        }
+
+
+
+        // === LOGIC TƯƠNG TÁC CHÍNH (SỬA LỖI TOUCH) ===
+
+        function handleToolboxStart(e) {
+            // SỬA LỖI SCROLL: Chỉ preventDefault nếu target là tool-item
+            const event = getEvent(e);
+            const toolItem = event.target.closest('.tool-item');
+
+            // Nếu không nhấn vào item (nhấn vào nền panel), cho phép scroll
+            if (!toolItem) {
+                isPotentialDrag = false;
+                return; 
+            }
+            
+            // Nếu nhấn vào item, ngăn scroll và bắt đầu logic kéo
+            e.preventDefault(); 
+            
+            // Kiểm tra xem item có bị cấm không
+            if (toolItem.classList.contains('tool-prohibited')) {
+                // Báo hiệu (ví dụ: rung nhẹ) và không cho kéo
+                toolItem.style.transform = 'scale(1.1) rotate(-5deg)';
+                setTimeout(() => toolItem.style.transform = 'scale(1)', 200);
+                isPotentialDrag = false; // Hủy kéo
+                return; // Đã tồn tại, không cho kéo
+            }
+
+
+            isPotentialDrag = true; // Bắt đầu nhấn chuột/chạm
+            touchStartX = event.clientX;
+            touchStartY = event.clientY;
+            
+            // KIỂM TRA CHẾ ĐỘ NỐI DÂY (CLICK)
+            if (toolItem.dataset.tool === 'wire') {
+                isWiringMode = !isWiringMode; // Chuyển đổi trạng thái
+                
+                if (isWiringMode) {
+                    document.body.classList.add('wiring-mode');
+                    wireToolCell.classList.add('active-tool');
+                    updateAIExplanation("Chế độ nối dây BẬT. Nhấn vào tủ điện, pin, tua-bin hoặc đèn để bắt đầu.");
+                } else {
+                    document.body.classList.remove('wiring-mode');
+                    wireToolCell.classList.remove('active-tool');
+                    updateAIExplanation("Chế độ nối dây TẮT.");
+                }
+                isPotentialDrag = false; // Đây là 1 cú click, không phải drag
+                return; // KHÔNG THỰC HIỆN KÉO THẢ
+            }
+            
+            // TẠO BẢN SAO ĐỂ KÉO (Chỉ khi KHÔNG ở chế độ nối dây)
+            if (!isWiringMode) {
+                // Logic kiểm tra độc quyền đã được dời lên trên
+            
+                draggedItemCopy = toolItem.cloneNode(true); 
+                draggedItemCopy.classList.add('dragging', 'cloned-item');
+                draggedItemCopy.classList.remove('tool-item', 'tool-prohibited'); // Xóa class cấm khỏi bản sao
+
+                const rect = toolItem.getBoundingClientRect();
+                offsetX = event.clientX - rect.left;
+                offsetY = event.clientY - rect.top;
+
+                draggedItemCopy.style.left = `${event.clientX - offsetX}px`;
+                draggedItemCopy.style.top = `${event.clientY - offsetY}px`;
+
+                document.body.appendChild(draggedItemCopy);
+            }
+        }
+        
+        function handleDropZoneStart(e) {
+             const event = getEvent(e); // Chuẩn hóa
+            isPotentialDrag = true; // Bắt đầu nhấn chuột
+            touchStartX = event.clientX;
+            touchStartY = event.clientY;
+            
+            const targetItem = event.target.closest('.cloned-item');
+
+            // TRƯỜNG HỢP 1: ĐANG Ở CHẾ ĐỘ NỐI DÂY
+            if (isWiringMode) {
+                e.preventDefault();
+                isPotentialDrag = false; // Nối dây không phải là kéo
+                // Phải có item VÀ item đó là một "đầu nối" hợp lệ
+                if (targetItem && wiringParticipants.includes(targetItem.dataset.tool)) {
+                    // Bắt đầu vẽ dây
+                    wiringStartItem = targetItem;
+                    const startPos = getCenter(wiringStartItem); 
+                    
+                    // Tạo dây tạm thời
+                    tempWire = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    tempWire.setAttribute('id', 'temp-wire');
+                    tempWire.setAttribute('d', `M ${startPos.x} ${startPos.y} L ${startPos.x} ${startPos.y}`);
+                    wireLayer.appendChild(tempWire);
+                    const explanation = `Bắt đầu nối dây từ ${wiringStartItem.title}. Kéo đến thiết bị khác...`;
+                    updateAIExplanation(explanation);
+                    // callTTSAPI(explanation); // Có thể thêm nếu muốn
+                }
+                return; 
+            }
+            
+            // TRƯỜNG HỢP 2: DI CHUYỂN CÔNG CỤ ĐÃ CÓ
+            if (targetItem) {
+                // SỬA LỖI CLICK: Luôn preventDefault để kéo/chạm hoạt động
+                e.preventDefault(); // Ngăn chặn text selection
+                
+                draggedItem = targetItem;
+                // SỬA LỖI CLICK: Đặt z-index ngay lập tức, nhưng chưa add 'dragging'
+                // 'dragging' sẽ được thêm trong 'mousemove' nếu chuột thực sự di chuyển
+                draggedItem.style.zIndex = 1001; 
+                
+                const rect = draggedItem.getBoundingClientRect();
+                offsetX = event.clientX - rect.left;
+                offsetY = event.clientY - rect.top;
+            }
+        }
+
+        // 4. DI CHUYỂN CHUỘT (Global)
+        function handleDragMove(e) {
+            // SỬA LỖI SCROLL: Chỉ preventDefault NẾU đang kéo/nối dây
+            if (isDragging || wiringStartItem) {
+                e.preventDefault(); 
+            }
+            
+            const event = getEvent(e); // Chuẩn hóa
+            
+            // SỬA LỖI CLICK: Nếu đang nhấn chuột (potentialDrag), và chuột di chuyển -> xác nhận là KÉO
+            if (isPotentialDrag && (draggedItem || draggedItemCopy)) {
+                // Chỉ đặt isDragging nếu thực sự di chuyển một khoảng nhỏ
+                if (Math.abs(event.clientX - touchStartX) > 5 || Math.abs(event.clientY - touchStartY) > 5) {
+                     isDragging = true; 
+                    // Thêm class dragging khi bắt đầu kéo
+                    if(draggedItem && !draggedItem.classList.contains('dragging')) draggedItem.classList.add('dragging');
+                    if(draggedItemCopy && !draggedItemCopy.classList.contains('dragging')) draggedItemCopy.classList.add('dragging'); // Thêm cho clone
+                }
+            }
+
+            const mousePos = getMousePos(event); // SỬA: Dùng event
+
+            // A. Đang kéo (di chuyển) item
+            if (draggedItem && isDragging) {
+                let x = mousePos.x - offsetX;
+                let y = mousePos.y - offsetY;
+
+                x = Math.max(0, Math.min(x, dropZone.clientWidth - draggedItem.clientWidth));
+                y = Math.max(0, Math.min(y, dropZone.clientHeight - draggedItem.clientHeight));
+                
+                draggedItem.style.left = `${x}px`;
+                draggedItem.style.top = `${y}px`;
+
+                // CẬP NHẬT DÂY DẪN (LUÔN LUÔN)
+                if (draggedItem.dataset.itemId) {
+                    updateConnectedWires(draggedItem.dataset.itemId);
+                }
+                
+                // CẬP NHẬT MÂY CHE/MẶT TRỜI (NẾU ĐANG KÉO MÂY/MẶT TRỜI)
+                const toolType = draggedItem.dataset.tool;
+                if (toolType === 'cloud' || toolType === 'sun') {
+                    updateAllSimulationStates("drag"); // Thêm context
+                }
+            }
+            // B. Đang kéo (sao chép) item mới
+            else if (draggedItemCopy && isDragging) {
+                draggedItemCopy.style.left = `${event.clientX - offsetX}px`;
+                draggedItemCopy.style.top = `${event.clientY - offsetY}px`;
+            }
+            // C. Đang kéo (nối dây)
+            else if (wiringStartItem && tempWire) {
+                const startPos = getCenter(wiringStartItem);
+                // Vẽ đường cong mượt theo vị trí chuột (cho mục đích xem trước)
+                tempWire.setAttribute('d', `M ${startPos.x} ${startPos.y} Q ${startPos.x} ${mousePos.y} ${mousePos.x} ${mousePos.y}`);
+            }
+        }
+
+        // 5. NHẢ CHUỘT (Global)
+        function handleDragEnd(e) {
+            let stateChanged = false; // Cờ theo dõi
+            let actionContext = null; // Theo dõi hành động
+            
+            // SỬA: Lấy clientX/Y từ sự kiện touch (changedTouches) nếu có
+            const event = e.changedTouches ? e.changedTouches[0] : e;
+
+            const dropZoneRect = dropZone.getBoundingClientRect();
+            const toolBoxRect = toolBox.getBoundingClientRect();
+
+            const isOverDropZone = event.clientX >= dropZoneRect.left && event.clientX <= dropZoneRect.right &&
+                                 event.clientY >= dropZoneRect.top && event.clientY <= dropZoneRect.bottom;
+            
+            const isOverToolBox = event.clientX >= toolBoxRect.left && event.clientX <= toolBoxRect.right &&
+                                event.clientY >= toolBoxRect.top && event.clientY <= toolBoxRect.bottom;
+
+            // TRƯỜNG HỢP 1: KẾT THÚC NỐI DÂY
+            if (isWiringMode && wiringStartItem) {
+                // SỬA: Lấy phần tử tại điểm chạm/click cuối cùng
+                const endElement = document.elementFromPoint(event.clientX, event.clientY);
+                const endItem = endElement ? endElement.closest('.cloned-item') : null;
+
+                const startType = wiringStartItem.dataset.tool;
+                const endType = endItem ? endItem.dataset.tool : null;
+                let explanation = "";
+
+                // Kiểm tra mục tiêu hợp lệ: Phải là đầu nối hợp lệ, không phải chính nó
+                if (endItem && endItem !== wiringStartItem && wiringParticipants.includes(endType)) 
+                {
+                    createPermanentWire(wiringStartItem, endItem);
+                    explanation = `Đã nối dây giữa ${wiringStartItem.title} và ${endItem.title}.`;
+                    stateChanged = true;
+                    actionContext = "wire";
+                    // Thông báo nối dây thành công đã có trong createPermanentWire
+                } else {
+                     explanation = "Nối dây không thành công. Hãy kéo từ một thiết bị đến một thiết bị khác.";
+                }
+                updateAIExplanation(explanation);
+                callTTSAPI(explanation); // Gọi TTS
+
+                // Reset trạng thái nối dây
+                if(tempWire) tempWire.remove();
+                tempWire = null;
+                wiringStartItem = null;
+                
+                // TẮT CHẾ ĐỘ NỐI DÂY VÀ HIỂN THỊ
+                isWiringMode = false;
+                document.body.classList.remove('wiring-mode');
+                wireToolCell.classList.remove('active-tool');
+                
+                updateAllSimulationStates(actionContext); // Cập nhật lại toàn bộ sau khi nối dây (hoặc không)
+                // return; // Không return vội, để reset isDragging
+            }
+            
+            // TRƯỜNG HỢP 2: THẢ CÔNG CỤ MỚI (CLONE)
+            else if (draggedItemCopy) {
+                draggedItemCopy.classList.remove('dragging');
+                
+                // Thêm kiểm tra
+                if (draggedItemCopy.parentNode === document.body) {
+                    document.body.removeChild(draggedItemCopy); 
+                }
+                
+                const newToolType = draggedItemCopy.dataset.tool;
+                const toolTitle = draggedItemCopy.title; // Lấy title để dùng cho AI Bot
+                let explanation = "";
+                
+                if (isOverDropZone && isDragging) { // Chỉ thả nếu thực sự kéo
+                    const mousePos = getMousePos(event); // SỬA: Dùng event
+                    
+                    let x = mousePos.x - offsetX;
+                    let y = mousePos.y - offsetY;
+
+                    // CẬP NHẬT LOGIC PHÓNG TO CHO RESPONSIVE
+                    const isMobile = (window.innerWidth < 768);
+                    const baseSize = isMobile ? 60 : 80;
+                    let scaleFactor = 1;
+
+                    if (newToolType === 'house') {
+                        scaleFactor = isMobile ? 3 : 4; // Giảm scale trên mobile
+                    } else if (newToolType === 'wind-turbine') {
+                        scaleFactor = isMobile ? 2.5 : 3; // Giảm scale trên mobile
+                    } else if (newToolType === 'solar-panel') { 
+                        scaleFactor = isMobile ? 1.5 : 2; // Giảm scale trên mobile
+                    }
+                    
+                    const newWidth = baseSize * scaleFactor;
+                    const newHeight = baseSize * scaleFactor;
+
+                    // Điều chỉnh vị trí thả dựa trên kích thước mới (tránh tràn lề)
+                    x = Math.max(0, Math.min(x, dropZone.clientWidth - newWidth));
+                    y = Math.max(0, Math.min(y, dropZone.clientHeight - newHeight));
+                    
+                    draggedItemCopy.style.left = `${x}px`;
+                    draggedItemCopy.style.top = `${y}px`;
+                    draggedItemCopy.style.width = `${newWidth}px`; 
+                    draggedItemCopy.style.height = `${newHeight}px`;
+                    
+                    // SỬA ĐỔI: Đặt z-index
+                    if (newToolType === 'house') {
+                        draggedItemCopy.style.zIndex = 5; // Dưới cùng
+                    } else if (newToolType === 'solar-panel') {
+                        draggedItemCopy.style.zIndex = 8; // Trên nhà, dưới dây
+                    } else {
+                        draggedItemCopy.style.zIndex = 20; // Mặc định
+                    }
+
+                    // Gán ID duy nhất cho item mới (để quản lý dây dẫn sau này)
+                    draggedItemCopy.dataset.itemId = generateUUID();
+                    
+                    dropZone.appendChild(draggedItemCopy);
+                    
+                    // BỎ GIẢI THÍCH KHI ĐẶT CÔNG CỤ
+                    // explanation = `Bạn vừa đặt ${toolTitle}.`;
+                    // updateAIExplanation(explanation);
+                    // callTTSAPI(explanation); // Gọi TTS
+                    actionContext = "drop"; // Đánh dấu là hành động thả
+
+                    // CẬP NHẬT: Gọi hàm snap Tủ điện/Pin mặt trời
+                    updateAllSnapPositions();
+                    
+                    // CẬP NHẬT TOÀN BỘ MÔ PHỎNG
+                    updateAllSimulationStates(actionContext);
+                    stateChanged = true;
+                } else {
+                    // Chỉ hiển thị nếu không phải là click vào tool cấm
+                     if(isDragging) {
+                         explanation = "Hãy thả công cụ vào khu vực bên trái.";
+                         updateAIExplanation(explanation);
+                         // callTTSAPI(explanation); // Có thể không cần đọc lỗi này
+                     }
+                }
+                draggedItemCopy = null;
+            }
+            
+            // TRƯỜNG HỢP 3: THẢ CÔNG CỤ ĐANG DI CHUYỂN (MOVE/DELETE)
+            else if (draggedItem) {
+                draggedItem.classList.remove('dragging'); // Xóa class dragging
+                let explanation = "";
+                
+                if (isOverToolBox && isDragging) { // Chỉ xóa nếu thực sự kéo
+                    const removedItemId = draggedItem.dataset.itemId;
+                    const toolTitle = draggedItem.title; // Lấy title cho AI Bot
+                    
+                    // XÓA DÂY DẪN LIÊN QUAN
+                    if (removedItemId) {
+                        removeWires(removedItemId);
+                    }
+
+                    draggedItem.remove(); 
+                    // THÊM MỚI: AI Bot giải thích
+                    explanation = `Bạn đã xóa ${toolTitle}.`;
+                    updateAIExplanation(explanation);
+                     callTTSAPI(explanation); // Gọi TTS
+                    stateChanged = true;
+                    actionContext = "delete";
+                    
+                } else if (isDragging) { // Chỉ thực hiện logic thả nếu thực sự kéo
+                    // Reset z-index chính xác khi thả
+                    if (draggedItem.dataset.tool === 'house') {
+                        draggedItem.style.zIndex = 5; 
+                    } else if (draggedItem.dataset.tool === 'solar-panel') {
+                        draggedItem.style.zIndex = 8;
+                    } else {
+                        draggedItem.style.zIndex = 20; 
+                    }
+
+                    // Cập nhật dây dẫn lần cuối khi thả
+                    if (draggedItem.dataset.itemId) {
+                        updateConnectedWires(draggedItem.dataset.itemId);
+                    }
+                    
+                    // CẬP NHẬT: Gọi hàm snap khi di chuyển Ngôi nhà
+                    if (draggedItem.dataset.tool === 'house') {
+                        updateAllSnapPositions();
+                    }
+                    stateChanged = true; // Coi di chuyển là một thay đổi
+                    actionContext = "move";
+                    // BỎ GIẢI THÍCH KHI DI CHUYỂN
+                    // updateAIExplanation(`Bạn đã di chuyển ${draggedItem.title}.`);
+                
+                // SỬA LỖI CLICK: Xử lý click công tắc ở đây
+                } else if (!isDragging && draggedItem.dataset.tool === 'switch') {
+                    // Đây là một cú CLICK (không phải kéo) lên công tắc
+                    draggedItem.classList.toggle('switch-on');
+                    explanation = draggedItem.classList.contains('switch-on') ? "Công tắc đã được bật." : "Công tắc đã được tắt.";
+                    updateAIExplanation(explanation);
+                    callTTSAPI(explanation); // Gọi TTS
+                    
+                    stateChanged = true;
+                    actionContext = "switch";
+                }
+                
+                // CẬP NHẬT TOÀN BỘ MÔ PHỎNG (sau khi xóa hoặc thả)
+                updateAllSimulationStates(actionContext);
+                draggedItem = null; 
+            }
+            
+            // SỬA LỖI CLICK: Reset trạng thái kéo
+            isDragging = false;
+            isPotentialDrag = false;
+
+            // LƯU TRẠNG THÁI VÀ ĐƯA RA GỢI Ý
+            if (stateChanged) {
+                saveState();
+                 // Chỉ đưa ra gợi ý nếu hành động không phải là "move"
+                if (actionContext !== "move") {
+                     setTimeout(provideNextStepGuidance, 1500); 
+                }
+            }
+        }
+        
+        // SỬA LỖI: Thêm các hàm xử lý sự kiện Touch VÀ Mouse
+        
+        // Mouse Events
+        toolBox.addEventListener('mousedown', handleToolboxStart);
+        dropZone.addEventListener('mousedown', handleDropZoneStart);
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
+
+        // Touch Events
+        toolBox.addEventListener('touchstart', handleToolboxStart, { passive: false });
+        dropZone.addEventListener('touchstart', handleDropZoneStart, { passive: false });
+        document.addEventListener('touchmove', handleDragMove, { passive: false });
+        document.addEventListener('touchend', handleDragEnd);
+
+        
+        // CẬP NHẬT: Xử lý sự kiện nhấn nút Gửi của AI Bot (Gọi Gemini)
+        aiSendButton.addEventListener('click', () => {
+            const question = aiQuestionInput.value.trim();
+            if (question && !aiSendButton.disabled) { // Kiểm tra nút có bị disable không
+                callGeminiAPI(question); // Gọi API
+                aiQuestionInput.value = ''; // Xóa input
+            }
+        });
+        // Cho phép gửi bằng Enter
+        aiQuestionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !aiSendButton.disabled) {
+                aiSendButton.click();
+            }
+        });
+
+        // THÊM MỚI: Listeners cho Reset và Undo
+        resetButton.addEventListener('click', resetSimulation);
+        undoButton.addEventListener('click', undo);
+
+        
+        // KHỞI CHẠY MÔ PHỎNG LẦN ĐẦU
+        updateAllSimulationStates();
+        // CẬP NHẬT: Lời chào đầu và hướng dẫn
+        const startupMessage = "Chào mừng! Kéo thả các công cụ từ bên phải vào để xây dựng nhà. Bắt đầu với 'Ngôi nhà' nhé!";
+        updateAIExplanation(startupMessage);
+        // BỎ GỌI TTS BAN ĐẦU ĐỂ TRÁNH LỖI AUTOPLAY
+        // callTTSAPI(startupMessage); 
+        
+        // THÊM MỚI: Lưu trạng thái ban đầu (rỗng)
+        saveState(); 
+
+
+    </script>
+</body>
+</html>
+
